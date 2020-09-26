@@ -8,8 +8,8 @@ Very similar implementation to other standard MS logging providers such as Conso
 - Rolling files 
 - Standard Microsoft.Extensions.Logging configuration (similar to Console logging, etc)
 - Plugable custom formatters
-- Abitity to change settings while running
-- Scopes
+- Abitity to change settings while running (using IOptionsMonitor)
+- Logging scopes
 
 ## Usage
  The log provider is configured just like any other Microsoft.Extensions.Logging providers.  There are extensions methods on the ILogBuilder to add the provider.
