@@ -22,6 +22,8 @@ Very similar implementation to other standard MS logging providers such as Conso
  
 ## Configuration
 
+Below is a sample configuration for the file provider.  The values shown are the defaults.
+
 ```
 {
   "Logging": {
