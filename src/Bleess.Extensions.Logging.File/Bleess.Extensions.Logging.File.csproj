@@ -28,6 +28,7 @@
        - Support for standard microsoft.extensions.logging configuration
        - Ability to reconfigure/change settings without restarting application
        - Asynchronous log file writing for high log througput and performance
+       - Current support for ms.extensions 3.x and greater
        
     </PackageReleaseNotes>
   </PropertyGroup>
@@ -41,7 +42,6 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging" Version="3.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="3.0.0" />
-    <PackageReference Include="Serilog.Extensions.Logging" Version="3.0.1" />
     <PackageReference Include="System.Text.Json" Version="4.7.2" />
   </ItemGroup>
 </Project>

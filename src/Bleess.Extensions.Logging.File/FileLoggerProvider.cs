@@ -2,8 +2,6 @@
 {
     using Microsoft.Extensions.Logging;
     using Microsoft.Extensions.Options;
-    using Serilog;
-    using Serilog.Extensions.Logging;
     using System;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
