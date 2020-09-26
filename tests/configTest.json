@@ -1,0 +1,17 @@
+{
+  "Logging": {
+
+    "File": {
+      "Path": "logs/configLog.txt",
+
+      "logLevel": {
+        "default": "Debug"
+      }
+    },
+
+    // by default AI only logs warn or above regardless of default level, so we need to change it here to get info
+    "logLevel": {
+      "default": "Information"
+    }
+  }
+}
