@@ -32,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\src\Bleess.Extensions.Logging.File\Bleess.Extensions.Logging.File.csproj" />
+    <ProjectReference Include="..\Bleess.Extensions.Logging.File\Bleess.Extensions.Logging.File.csproj" />
   </ItemGroup>
 
 </Project>
