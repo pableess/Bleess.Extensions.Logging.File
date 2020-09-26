@@ -4,7 +4,32 @@
     <TargetFrameworks>netstandard2.0;</TargetFrameworks>
     <LangVersion>8.0</LangVersion>
 
+    <VersionPrefix>1.0.0</VersionPrefix>
 
+    <Authors>Paul Bleess</Authors>
+    <Description>Simple file logger for dotnet Microsoft.Extensions.Logging</Description>
+    <Title>File logging for Microsoft.Extensions.Logging</Title>
+    <Copyright>Copyright (c) 2020 Paul Bleess and contributors</Copyright>
+    <AssemblyTitle>Bleess.Extensions.Logging.File</AssemblyTitle>
+    <TargetFrameworks>netstandard2.0</TargetFrameworks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyName>Bleess.Extensions.Logging.File</AssemblyName>
+    <PackageId>Bleess.Extensions.Logging.File</PackageId>
+    <PackageTags>microsoft-extensions-logging;log;file;logging;aspnetcore;file-logger;logging-provider;netstandard;netcore</PackageTags>
+    <PackageProjectUrl>https://github.com/pableess/Bleess.Extensions.Logging.File</PackageProjectUrl>
+    <PackageLicenseUrl>https://raw.githubusercontent.com/pableess/Bleess.Extensions.Logging.File/master/LICENSE</PackageLicenseUrl>
+    <PackageReleaseNotes>
+      How to use: https://github.com/pableess/Bleess.Extensions.Logging.File
+
+      Initial Release 1.0.0
+       - Basic file logging features rolling files, maximum file length, max number of files
+       - Simple text and json formatters with options for single line, multi-line, and separated log statements
+       - Support for logging scopes
+       - Support for standard microsoft.extensions.logging configuration
+       - Ability to reconfigure/change settings without restarting application
+       - Asynchronous log file writing for high log througput and performance
+       
+    </PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

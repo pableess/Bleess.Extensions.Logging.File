@@ -12,7 +12,7 @@
 
 
     /// <summary>
-    /// A log provider for logging to a file using serilog file logging
+    /// A rolling file log provider 
     /// </summary>
     [ProviderAlias("File")]
     public sealed class FileLoggerProvider : ILoggerProvider, ISupportExternalScope, IDisposable
@@ -26,8 +26,8 @@
 
         /// Creates an instance of <see cref="FileLoggerProvider"/>.
         /// </summary>
-        /// <param name="options">The options to create <see cref="ConsoleLogger"/> instances with.</param>
-        /// <param name="formatters">Log formatters added for <see cref="ConsoleLogger"/> insteaces.</param>
+        /// <param name="options">The options to create <see cref="FileLogger"/> instances with.</param>
+        /// <param name="formatters">Log formatters added for <see cref="FileLogger"/> insteaces.</param>
         public FileLoggerProvider(IOptionsMonitor<FileLoggerOptions> options, IEnumerable<FileFormatter> formatters)
         {
             this.options = options;
@@ -79,6 +79,7 @@
             }
         }
 
+        /// <inheritdoc/>
         public Microsoft.Extensions.Logging.ILogger CreateLogger(string name)
         {
             this.formatters.TryGetValue(this.options.CurrentValue.FormatterName, out var logFormatter);
