@@ -37,14 +37,6 @@ namespace Bleess.Extensions.Logging.File
         internal string ExpandedPath => Environment.ExpandEnvironmentVariables(Path);
 
         /// <summary>
-        /// Gets or sets the Json.
-        /// </summary>
-        /// <value>
-        /// The Json.
-        /// </value>
-        public bool Json { get; set; } = false;
-
-        /// <summary>
         /// Gets or sets the MaxFileSizeInMB.
         /// </summary>
         /// <value>
@@ -59,11 +51,6 @@ namespace Bleess.Extensions.Logging.File
         /// The MaxNumberFiles.
         /// </value>
         public int MaxNumberFiles { get; set; } = 7;
-
-        /// <summary>
-       /// Roll the log file on maximum size
-        /// </summary>
-        public bool RollOnFileSizeLimit { get; set; } = true;
 
         /// <summary>
         /// Whether or not to append to and existing file
