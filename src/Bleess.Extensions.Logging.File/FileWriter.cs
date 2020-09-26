@@ -77,6 +77,14 @@ namespace Bleess.Extensions.Logging.File
                 var logDirName = Path.GetDirectoryName(this.FilePath);
                 if (String.IsNullOrEmpty(logDirName))
                     logDirName = Directory.GetCurrentDirectory();
+
+                if (!Directory.Exists(logDirName))
+                {
+                    // no files yet, use default name
+                    currentLogFileName = this.FilePath;
+                    return;
+                }
+
                 var logFiles = Directory.GetFiles(logDirName, logFileMask, SearchOption.TopDirectoryOnly);
                 if (logFiles.Length > 0)
                 {

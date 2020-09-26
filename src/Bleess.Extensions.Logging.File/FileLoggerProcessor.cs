@@ -44,7 +44,7 @@ namespace Bleess.Extensions.Logging.File
             // Adding is completed so just log the message
             try
             {
-                _writer.WriteMessage(message.Message, true);
+                _writer?.WriteMessage(message.Message, true);
             }
             catch (Exception) { }
         }
@@ -52,19 +52,27 @@ namespace Bleess.Extensions.Logging.File
         // this needs to be called before the 
         public void ConfigureWriter(FileLoggerOptions options) 
         {
-            // if the file path didn't change, just update the limits
-            if (this._writer != null && this._writer?.FilePath == options.ExpandedPath)
+            try
             {
-                this._writer.SetLimits(options.MaxFileSizeInBytes, options.MaxNumberFiles);
+
+                // if the file path didn't change, just update the limits
+                if (this._writer != null && this._writer?.FilePath == options.ExpandedPath)
+                {
+                    this._writer.SetLimits(options.MaxFileSizeInBytes, options.MaxNumberFiles);
+                }
+                else
+                {
+                    // else swap out the writer and close the old one 
+                    var newWriter = new FileWriter(options.ExpandedPath, options.MaxFileSizeInBytes, options.MaxNumberFiles, options.Append);
+
+                    FileWriter oldWriter = Interlocked.Exchange(ref this._writer, newWriter) as FileWriter;
+
+                    oldWriter?.Close();
+                }
             }
-            else 
+            catch (Exception writerError) 
             {
-                // else swap out the writer and close the old one 
-                var newWriter = new FileWriter(options.ExpandedPath, options.MaxFileSizeInBytes, options.MaxNumberFiles, options.Append);
-
-                FileWriter oldWriter = Interlocked.Exchange(ref this._writer, newWriter) as FileWriter;
-
-                oldWriter?.Close();
+                System.Diagnostics.Trace.TraceError($"Error creating file writer: {writerError.ToString()}");
             }
         }
 
@@ -76,7 +84,7 @@ namespace Bleess.Extensions.Logging.File
             {
                 foreach (LogMessageEntry message in _messageQueue.GetConsumingEnumerable())
                 {
-                    _writer.WriteMessage(message.Message, _messageQueue.Count == 0);
+                    _writer?.WriteMessage(message.Message, _messageQueue.Count == 0);
                 }
             }
             catch
@@ -102,7 +110,7 @@ namespace Bleess.Extensions.Logging.File
 
 
             // flush and close writer
-            _writer.Close();
+            _writer?.Close();
 
         }
     }
