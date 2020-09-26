@@ -22,12 +22,12 @@
       How to use: https://github.com/pableess/Bleess.Extensions.Logging.File
 
       Initial Release 1.0.0
-       - Basic file logging features rolling files, maximum file length, max number of files
+       - Basic file logging features: rolling files, maximum file length, max number of files, etc
        - Simple text and json formatters with options for single line, multi-line, and separated log statements
        - Support for logging scopes
-       - Support for standard microsoft.extensions.logging configuration
+       - Support for idiomatic microsoft.extensions.logging configuration
        - Ability to reconfigure/change settings without restarting application
-       - Asynchronous log file writing for high log througput and performance
+       - Asynchronous log file writing for high log throughput and performance
        - Current support for ms.extensions 3.x and greater
        
     </PackageReleaseNotes>
