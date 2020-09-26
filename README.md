@@ -1,7 +1,7 @@
 # Bleess.Extensions.Logging.File
 Simple rolling file logger for Microsoft.Extensions.Logging with no 3rd party dependencies
 
-Very similar implementation to other standard MS logging providers such as Console Logger.
+Very similar implementation to other standard MS logging providers such as Console Logger in dotnet 5.
 
 ## Features include
 - Text or Json output
@@ -10,6 +10,10 @@ Very similar implementation to other standard MS logging providers such as Conso
 - Plugable custom formatters
 - Abitity to change settings while running (using IOptionsMonitor)
 - Logging scopes
+- High performance using dedicated write thread and message queue
+
+
+This project is very similar to nReco/logging with a few additions noteably logging scopes, json output, streamlined configuration, and abiltity to modify settings while running.
 
 ## Usage
  The log provider is configured just like any other Microsoft.Extensions.Logging providers.  There are extensions methods on the ILogBuilder to add the provider.
