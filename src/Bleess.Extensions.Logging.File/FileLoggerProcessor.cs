@@ -20,11 +20,11 @@ namespace Bleess.Extensions.Logging.File
 
             ConfigureWriter(initialOptions);
 
-            // Start Console message queue processor
+            // Start file message queue processor
             _outputThread = new Thread(ProcessLogQueue)
             {
                 IsBackground = true,
-                Name = "Console logger queue processing thread"
+                Name = "File logger queue processing thread"
             };
             _outputThread.Start();
         }
