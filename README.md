@@ -13,7 +13,7 @@ Very similar implementation to other standard MS logging providers such as Conso
 - High performance using dedicated write thread and message queue
 
 
-This project is very similar to nReco/logging with a few additions noteably logging scopes, json output, streamlined configuration, and abiltity to modify settings while running.
+This project is very similar to nReco/logging with a few additions: logging scopes, json output, streamlined configuration, and abiltity to modify settings while running.
 
 ## Usage
 
@@ -64,10 +64,10 @@ Custom formatters can be plugged in the same way as with Console Logger in dotne
 
 
 ## Rolling Behavior
- Log files can have a max file size at which time a new file will be create with a increment id.  You can also specify a maximum nuber of files to retain.  Once the maximum number of files has been reteached the oldest will be overwritten.
+ Log files can have a max file size at which time a new file will be create with a incremented id appended.  You may also specify a maximum number of files to retain.  Once the maximum number of files has been reteached the oldest will be overwritten.
 
 ## Credits
- - Most of the code was a port from dotnet source code (specifically Microsoft.Extensions.Logging.Console) https://github.com/dotnet/runtime/tree/master/src/libraries/Microsoft.Extensions.Logging.Console
+ - Most of the code was a adapted from dotnet source code (specifically Microsoft.Extensions.Logging.Console) https://github.com/dotnet/runtime/tree/master/src/libraries/Microsoft.Extensions.Logging.Console
  - The FileWriter was adapted from https://github.com/nreco/logging
  
  
