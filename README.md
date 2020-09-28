@@ -31,23 +31,17 @@ Add the nuget package Bleess.Extensions.Logging.File
 
 Below is a sample configuration for the file provider.  The values shown are the defaults.
 
-```json
+```
 {
   "Logging": {
 
-    "File": {
-      // this is can also be set in the formatter options
-      "IncludeScopes": true, 
+    "File": {    
+      "IncludeScopes": true,   // this is can also be set in the formatter options
       "Path": "logs/log.txt",
       "MaxNumberFile": 7,
-      
-      // this can be decimal
-      "MaxFileSizeInMB": 50,  
-      
-      // simple or json
-      "FormatterName": "simple",  
+      "MaxFileSizeInMB": 50,  // this can be decimal
+      "FormatterName": "simple",  // simple or json
       "Append": true,
-      
       "logLevel": {
         "default": "Information"
       }
