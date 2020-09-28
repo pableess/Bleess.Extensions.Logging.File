@@ -36,14 +36,18 @@ Below is a sample configuration for the file provider.  The values shown are the
   "Logging": {
 
     "File": {
-      "IncludeScopes": true, // this is can also be set in the formatter options
+      // this is can also be set in the formatter options
+      "IncludeScopes": true, 
       "Path": "logs/log.txt",
       "MaxNumberFile": 7,
-      "MaxFileSizeInMB": 50,  // this can be decimal
-      "FormatterName": "simple",  // simple or json
+      
+      // this can be decimal
+      "MaxFileSizeInMB": 50,  
+      
+      // simple or json
+      "FormatterName": "simple",  
       "Append": true,
-
-     
+      
       "logLevel": {
         "default": "Information"
       }
