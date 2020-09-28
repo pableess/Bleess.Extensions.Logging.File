@@ -37,7 +37,7 @@ Below is a sample configuration for the file provider.  The values shown are the
 
     "File": {    
       "IncludeScopes": true,   // this is can also be set in the formatter options
-      "Path": "logs/log.txt",
+      "Path": "logs/log.txt",  // can contain environment variables
       "MaxNumberFile": 7,
       "MaxFileSizeInMB": 50,  // this can be decimal
       "FormatterName": "simple",  // simple or json
