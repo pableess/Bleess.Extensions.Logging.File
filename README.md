@@ -42,6 +42,10 @@ Below is a sample configuration for the file provider.  The values shown are the
       "MaxFileSizeInMB": 50,  // this can be decimal
       "FormatterName": "simple",  // simple or json
       "Append": true,
+      "formatterOptions" : { 
+          // see formatter options below 
+      }
+      
       "logLevel": {
         "default": "Information"
       }
@@ -75,7 +79,7 @@ There are two built in formatters.  Simple text and Json.  The formatters have a
    "TimestampFormat" : "yyyy-MM-dd h:mm tt",
    "UseUtcTimestamp" : false,
    "JsonWriterOptions" : {
-      "... see https"://docs.microsoft.com/en-us/dotnet/api/system.text.json.jsonwriteroptions?view=netcore-3.1
+      // see https"://docs.microsoft.com/en-us/dotnet/api/system.text.json.jsonwriteroptions?view=netcore-3.1
    }
 }
 ```
