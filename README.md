@@ -21,9 +21,9 @@ Add the nuget package Bleess.Extensions.Logging.File
 
  The log provider is configured just like any other Microsoft.Extensions.Logging providers.  There are extensions methods on the ILogBuilder to add the provider.
  
- When using Host.CreateDefaultBuilder you only need to call AddFile(), and the logger will be configured using configuration providers.  There are also other overloads to configure the logger using options callbacks etc.
+ When using Host.CreateDefaultBuilder you only need to call `AddFile()`, and the logger will be configured using configuration providers.  There are also other overloads to configure the logger using options callbacks etc.
  
- ```
+ ```csharp
  logBuilder.AddFile();
  ```
  
@@ -31,17 +31,19 @@ Add the nuget package Bleess.Extensions.Logging.File
 
 Below is a sample configuration for the file provider.  The values shown are the defaults.
 
-```
+```json
 {
   "Logging": {
 
     "File": {
-      "IncludeScopes": true,
+      "IncludeScopes": true, // this is can also be set in the formatter options
       "Path": "logs/log.txt",
       "MaxNumberFile": 7,
       "MaxFileSizeInMB": 50,  // this can be decimal
       "FormatterName": "simple",  // simple or json
       "Append": true,
+
+     
       "logLevel": {
         "default": "Information"
       }
@@ -58,9 +60,29 @@ Below is a sample configuration for the file provider.  The values shown are the
 ## Formatting
 There are two built in formatters.  Simple text and Json.  The formatters have a few limited options.
 
-TODO: Document formatter configuration
+```
+// simple text
+"formatterOptions": {
+   "IncludeScopes" : false,
+   "SingleLine" : false,
+   "EmptyLineBetweenMessages" : true,
+   "TimestampFormat" : "yyyy-MM-dd h:mm tt",
+   "UseUtcTimestamp" : false
+}
 
-Custom formatters can be plugged in the same way as with Console Logger in dotnet 5.
+// json formatter
+"formatterOptions" : {
+   "IncludeScopes" : false,
+   "EmptyLineBetweenMessages" : true,
+   "TimestampFormat" : "yyyy-MM-dd h:mm tt",
+   "UseUtcTimestamp" : false,
+   "JsonWriterOptions" : {
+      "... see https"://docs.microsoft.com/en-us/dotnet/api/system.text.json.jsonwriteroptions?view=netcore-3.1
+   }
+}
+```
+
+Custom formatters can be plugged usng extensions method `.AddFileFormatter<TFormatter, TOptions>(this ILoggingBuilder builder, Action<TOptions> configure)`
 
 
 ## Rolling Behavior
