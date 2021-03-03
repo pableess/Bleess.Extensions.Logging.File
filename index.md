@@ -1,37 +1,94 @@
-## Welcome to GitHub Pages
+Simple rolling file logger for Microsoft.Extensions.Logging with no 3rd party dependencies
 
-You can use the [editor on GitHub](https://github.com/pableess/Bleess.Extensions.Logging.File/edit/gh-pages/index.md) to maintain and preview the content for your website in Markdown files.
+Very similar implementation to other standard MS logging providers such as Console Logger in dotnet 5.
 
-Whenever you commit to this repository, GitHub Pages will run [Jekyll](https://jekyllrb.com/) to rebuild the pages in your site, from the content in your Markdown files.
+## Features
+- Text or Json output
+- Rolling files 
+- Standard Microsoft.Extensions.Logging configuration (similar to Console logging, etc)
+- Plugable custom formatters
+- Abitity to change settings while running (using IOptionsMonitor)
+- Logging scopes
+- High performance using dedicated write thread and message queue
 
-### Markdown
 
-Markdown is a lightweight and easy-to-use syntax for styling your writing. It includes conventions for
+This project is very similar to nReco/logging with a few additions: logging scopes, json output, streamlined configuration, and abiltity to modify settings while running.
 
-```markdown
-Syntax highlighted code block
+## Usage
 
-# Header 1
-## Header 2
-### Header 3
+Add the nuget package Bleess.Extensions.Logging.File
 
-- Bulleted
-- List
+ The log provider is configured just like any other Microsoft.Extensions.Logging providers.  There are extensions methods on the ILogBuilder to add the provider.
+ 
+ When using Host.CreateDefaultBuilder you only need to call `AddFile()`, and the logger will be configured using configuration providers.  There are also other overloads to configure the logger using options callbacks etc.
+ 
+ ```csharp
+ logBuilder.AddFile();
+ ```
+ 
+## Configuration
 
-1. Numbered
-2. List
+Below is a sample configuration for the file provider.  The values shown are the defaults.
 
-**Bold** and _Italic_ and `Code` text
+```
+{
+  "Logging": {
 
-[Link](url) and ![Image](src)
+    "File": {    
+      "IncludeScopes": true,   // this is can also be set in the formatter options
+      "Path": "logs/log.txt",  // can contain environment variables
+      "MaxNumberFiles": 7,
+      "MaxFileSizeInMB": 50,  // this can be decimal
+      "FormatterName": "simple",  // simple or json
+      "Append": true,
+      "formatterOptions" : { 
+          // see formatter options below 
+      }
+      
+      "logLevel": {
+        "default": "Information"
+      }
+    },
+
+    "logLevel": {
+      "default": "Information"
+    }
+  }
+}
+
 ```
 
-For more details see [GitHub Flavored Markdown](https://guides.github.com/features/mastering-markdown/).
+## Formatting
+There are two built in formatters.  Simple text and Json.  The formatters have a few limited options.
 
-### Jekyll Themes
+```
+// simple text
+"formatterOptions": {
+   "IncludeScopes" : false,
+   "SingleLine" : false,
+   "EmptyLineBetweenMessages" : true,
+   "TimestampFormat" : "yyyy-MM-dd h:mm tt",
+   "UseUtcTimestamp" : false
+}
 
-Your Pages site will use the layout and styles from the Jekyll theme you have selected in your [repository settings](https://github.com/pableess/Bleess.Extensions.Logging.File/settings). The name of this theme is saved in the Jekyll `_config.yml` configuration file.
+// json formatter
+"formatterOptions" : {
+   "IncludeScopes" : false,
+   "EmptyLineBetweenMessages" : true,
+   "TimestampFormat" : "yyyy-MM-dd h:mm tt",
+   "UseUtcTimestamp" : false,
+   "JsonWriterOptions" : {
+      // see https"://docs.microsoft.com/en-us/dotnet/api/system.text.json.jsonwriteroptions?view=netcore-3.1
+   }
+}
+```
 
-### Support or Contact
+Custom formatters can be plugged usng extensions method `.AddFileFormatter<TFormatter, TOptions>(this ILoggingBuilder builder, Action<TOptions> configure)`
 
-Having trouble with Pages? Check out our [documentation](https://docs.github.com/categories/github-pages-basics/) or [contact support](https://support.github.com/contact) and we’ll help you sort it out.
+
+## Rolling Behavior
+ Log files can have a max file size at which time a new file will be create with a incremented id appended.  You may also specify a maximum number of files to retain.  Once the maximum number of files has been reteached the oldest will be overwritten.
+
+## Credits
+ - Most of the code was a adapted from dotnet source code (specifically Microsoft.Extensions.Logging.Console) https://github.com/dotnet/runtime/tree/master/src/libraries/Microsoft.Extensions.Logging.Console
+ - The FileWriter was adapted from https://github.com/nreco/logging     
