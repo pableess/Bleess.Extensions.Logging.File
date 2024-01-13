@@ -7,8 +7,16 @@ using System.Text;
 
 namespace Bleess.Extensions.Logging.File
 {
+    /// <summary>
+    /// Base class for file formatter
+    /// </summary>
     public abstract class FileFormatter
     {
+        /// <summary>
+        /// Creates a <see cref="FileFormatter"/>
+        /// </summary>
+        /// <param name="name"></param>
+        /// <exception cref="ArgumentNullException"></exception>
         public FileFormatter(string name)
         {
             Name = name ?? throw new ArgumentNullException(name);

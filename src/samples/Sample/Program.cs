@@ -13,7 +13,11 @@ namespace Sample
         {
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureServices(s => s.AddHostedService<LoggingService>())
-                .ConfigureLogging(l => l.AddFile())
+                .ConfigureLogging(l =>
+                {
+                    l.AddConsole();
+                    //l.AddFiles();
+                })
                 .Build();
 
             host.Run();
@@ -31,6 +35,7 @@ namespace Sample
         protected async override Task ExecuteAsync(CancellationToken stoppingToken)
         {
             int i = 0;
+            var r = new Random();
 
             while (!stoppingToken.IsCancellationRequested) 
             {
@@ -40,7 +45,12 @@ namespace Sample
 
                     this.logger.LogDebug("This should be logged");
 
-                    await Task.Delay(50);
+                    if (r.Next(100) > 75)
+                    {
+                        this.logger.LogError("This is an error");
+                    }
+
+                    await Task.Delay(1000);
                 }
             }
         }

@@ -9,6 +9,9 @@ namespace Bleess.Extensions.Logging.File
     /// </summary>
     public class SimpleFileFormatterOptions : FileFormatterOptions
     {
+        /// <summary>
+        /// Creates <see cref="SimpleFileFormatterOptions"/>
+        /// </summary>
         public SimpleFileFormatterOptions() { }
 
         /// <summary>

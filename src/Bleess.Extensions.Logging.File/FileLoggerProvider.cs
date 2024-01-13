@@ -15,29 +15,37 @@
     [ProviderAlias("File")]
     public sealed class FileLoggerProvider : ILoggerProvider, ISupportExternalScope, IDisposable
     {
-        private readonly IOptionsMonitor<FileLoggerOptions> options;
+        private readonly IOptionsMonitor<FileLoggerOptions> optionsMonitor;
         private IDisposable optionsReloadToken;
         private IExternalScopeProvider scopeProvider  = NullScopeProvider.Instance;
         private readonly ConcurrentDictionary<string, FileLogger> loggers;
         private ConcurrentDictionary<string, FileFormatter> formatters;
         private readonly FileLoggerProcessor messageQueue;
+        private readonly string loggerName;
 
+        /// <summary>
         /// Creates an instance of <see cref="FileLoggerProvider"/>.
         /// </summary>
         /// <param name="options">The options to create <see cref="FileLogger"/> instances with.</param>
         /// <param name="formatters">Log formatters added for <see cref="FileLogger"/> insteaces.</param>
-        public FileLoggerProvider(IOptionsMonitor<FileLoggerOptions> options, IEnumerable<FileFormatter> formatters)
+        /// <param name="loggerName">The file logger name</param>
+        public FileLoggerProvider(IOptionsMonitor<FileLoggerOptions> options, IEnumerable<FileFormatter> formatters, string loggerName = null)
         {
-            this.options = options;
+            this.loggerName = loggerName;
+            this.optionsMonitor = options;
             this.loggers = new ConcurrentDictionary<string, FileLogger>();
 
             SetFormatters(formatters);
-            this.messageQueue = new FileLoggerProcessor(options.CurrentValue);
 
-            optionsReloadToken = this.options.OnChange(ReloadLoggerOptions);
+            this.messageQueue = new FileLoggerProcessor(Options);
 
-            ReloadFormatters(options.CurrentValue);
+            optionsReloadToken = this.optionsMonitor.OnChange(ReloadLoggerOptions);
+
+            ReloadFormatters(Options);
         }
+
+        private FileLoggerOptions _cacheOptions;
+        private FileLoggerOptions Options => _cacheOptions ??= optionsMonitor.Get(this.loggerName);
 
         private void SetFormatters(IEnumerable<FileFormatter> formatters = null)
         {
@@ -58,16 +66,19 @@
             }
         }
 
-        private void ReloadLoggerOptions(FileLoggerOptions options)
+        private void ReloadLoggerOptions(FileLoggerOptions options, string optionName)
         {
-            this.messageQueue.ConfigureWriter(options);
-            ReloadFormatters(options);
-
+            if (string.Equals(optionName, this.loggerName))
+            {
+                _cacheOptions = options;
+                this.messageQueue.ConfigureWriter(options);
+                ReloadFormatters(options);
+            }
         }
 
         private void ReloadFormatters(FileLoggerOptions options)
         {
-            this.formatters.TryGetValue(this.options.CurrentValue.FormatterName, out var logFormatter);
+            this.formatters.TryGetValue(this.Options.FormatterName, out var logFormatter);
 
             UpdateFormatterOptions(logFormatter, options);
 
@@ -80,9 +91,9 @@
         /// <inheritdoc/>
         public Microsoft.Extensions.Logging.ILogger CreateLogger(string name)
         {
-            this.formatters.TryGetValue(this.options.CurrentValue.FormatterName, out var logFormatter);
+            this.formatters.TryGetValue(this.Options.FormatterName, out var logFormatter);
 
-            UpdateFormatterOptions(logFormatter, this.options.CurrentValue);
+            UpdateFormatterOptions(logFormatter, this.Options);
 
             return this.loggers.GetOrAdd(name, loggerName => new FileLogger(name, this.messageQueue)
             {
@@ -109,8 +120,10 @@
             }
         }
 
+        /// <inheritdoc/>
         public void Dispose()
         {
+            this.loggers?.Clear();
             this.messageQueue?.Dispose();
             this.optionsReloadToken?.Dispose();
         }

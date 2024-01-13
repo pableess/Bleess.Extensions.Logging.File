@@ -150,8 +150,8 @@ namespace Bleess.Extensions.Logging.File
                     writer.WriteNumber(key, sbyteValue);
                     break;
                 case char charValue:
-#if NETCOREAPP
-                    writer.WriteString(key, MemoryMarshal.CreateSpan(ref charValue, 1));
+#if NET8_0_OR_GREATER
+                    writer.WriteString(key, System.Runtime.InteropServices.MemoryMarshal.CreateSpan(ref charValue, 1));
 #else
                     writer.WriteString(key, charValue.ToString());
 #endif

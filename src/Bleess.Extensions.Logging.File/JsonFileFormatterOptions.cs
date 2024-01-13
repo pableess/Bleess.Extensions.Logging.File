@@ -10,6 +10,9 @@ namespace Bleess.Extensions.Logging.File
     /// </summary>
     public class JsonFileFormatterOptions : FileFormatterOptions
     {
+        /// <summary>
+        /// Creates <see cref="JsonFileFormatterOptions"/>
+        /// </summary>
         public JsonFileFormatterOptions() { }
 
         /// <summary>
