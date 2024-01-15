@@ -7,7 +7,15 @@ using System.Threading.Tasks;
 
 namespace Bleess.Extensions.Logging.File
 {
-    public class CompositeLoggerFilterOptions : LoggerFilterOptions
+    /// <summary>
+    /// Special settings/options for adding filter rules for logger defined under a composite logging provider
+    /// </summary>
+    public record class CompositeLoggerFilterOptions
     {
+        /// <summary>
+        ///   Gets the collection of Microsoft.Extensions.Logging.LoggerFilterRule used for
+        ///     filtering log messages.
+        /// </summary>
+        public IList<LoggerFilterRule> Rules { get; } = new List<LoggerFilterRule>();
     }
 }

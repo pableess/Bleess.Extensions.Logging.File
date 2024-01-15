@@ -5,8 +5,14 @@ using System.Text;
 
 namespace Bleess.Extensions.Logging.File
 {
-    public class FileFormatterOptions
+    /// <summary>
+    /// Base class for filter formatter options
+    /// </summary>
+    public record class FileFormatterOptions
     {
+        /// <summary>
+        /// Creates FileFormatter options
+        /// </summary>
         public FileFormatterOptions() { }
 
         /// <summary>

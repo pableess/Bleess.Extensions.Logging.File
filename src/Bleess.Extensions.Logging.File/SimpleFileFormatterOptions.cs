@@ -7,7 +7,7 @@ namespace Bleess.Extensions.Logging.File
     /// <summary>
     /// Options for the built-in default console log formatter.
     /// </summary>
-    public class SimpleFileFormatterOptions : FileFormatterOptions
+    public record class SimpleFileFormatterOptions : FileFormatterOptions
     {
         /// <summary>
         /// Creates <see cref="SimpleFileFormatterOptions"/>

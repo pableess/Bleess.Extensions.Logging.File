@@ -4,16 +4,17 @@ Simple rolling file logger for Microsoft.Extensions.Logging with no 3rd party de
 Very similar implementation to other standard MS logging providers such as Console Logger in dotnet 5.
 
 ## Features
-- Text or Json output
 - Rolling files 
-- Standard Microsoft.Extensions.Logging configuration (similar to Console logging, etc)
+- Text or Json output
+- Standard idomatic configuration (similar to other MS logging providers) using IConfiguration or configuration callbacks
 - Plugable custom formatters
-- Abitity to change settings while running (using IOptionsMonitor)
-- Logging scopes
+- Abitity to update settings such as log level, filter rules, or log file path while application is running
+- Logging scopes and activity tracking support
 - High performance using dedicated write thread and message queue
+- Ability to specify multiple log files with independent settings
 
 
-This project is very similar to nReco/logging with a few additions: logging scopes, json output, streamlined configuration, and abiltity to modify settings while running.
+This project is very similar to nReco/logging with a few additions: multiple files, logging scopes, json output, streamlined configuration, and abiltity to modify settings while running.
 
 ## Usage
 
@@ -31,7 +32,7 @@ Add the nuget package Bleess.Extensions.Logging.File
 
 Below is a sample configuration for the file provider.  The values shown are the defaults.
 
-```
+```json
 {
   "Logging": {
 
@@ -62,9 +63,9 @@ Below is a sample configuration for the file provider.  The values shown are the
 ## Formatting
 There are two built in formatters.  Simple text and Json.  The formatters have a few limited options.
 
-```
+```json
 // simple text
-"formatterOptions": {
+"FormatterOptions": {
    "IncludeScopes" : false,
    "SingleLine" : false,
    "EmptyLineBetweenMessages" : true,
@@ -73,7 +74,7 @@ There are two built in formatters.  Simple text and Json.  The formatters have a
 }
 
 // json formatter
-"formatterOptions" : {
+"FormatterOptions" : {
    "IncludeScopes" : false,
    "EmptyLineBetweenMessages" : true,
    "TimestampFormat" : "yyyy-MM-dd h:mm tt",
@@ -84,7 +85,60 @@ There are two built in formatters.  Simple text and Json.  The formatters have a
 }
 ```
 
-Custom formatters can be plugged usng extensions method `.AddFileFormatter<TFormatter, TOptions>(this ILoggingBuilder builder, Action<TOptions> configure)`
+Custom formatters can be added using extensions method `.AddFileFormatter<TFormatter, TOptions>(this ILoggingBuilder builder, Action<TOptions> configure)`.  The Formatter name of the log provider will need to be set in order to use the formatter.
+
+## Multiple log files
+
+Multiple log files are supported.  Example below:
+```csharp
+l.AddFiles(b =>
+{
+    // example adding log provider, will use settings in configuration
+    b.AddFile("TraceLog");
+
+    // example configuration certain properties in code, which would override config settings
+    b.AddFile("ErrorLog")
+        .WithOptions(o =>
+        {
+            o.Path = "logs/errors.json";
+        })
+        .WithJsonFormatter(o =>
+        {
+            o.IncludeScopes = true;
+            o.EmptyLineBetweenMessages = false;
+            o.TimestampFormat = "dd h:mm tt";
+        })
+        .WithMinLevel(LogLevel.Error);
+});
+
+```
+
+Example configuration
+```json
+ "Logging": {
+
+    "Files": {
+
+      "TraceLog": {
+        "Path": "logs/trace.txt",
+        "FormatterOptions": {
+          "IncludeScopes": false,
+          "SingleLine": true,
+          "EmptyLineBetweenMessages": false,
+          "TimestampFormat": "yyyy-MM-dd h:mm tt",
+          "UseUtcTimestamp": true
+        },
+        "logLevel": {
+          "Default": "Trace",
+          "Microsoft": "Warning"
+        }
+      },
+
+
+      "ErrorLog": {} // defined in code 
+
+    },
+```
 
 
 ## Rolling Behavior

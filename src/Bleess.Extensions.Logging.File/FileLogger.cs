@@ -25,6 +25,12 @@ namespace Bleess.Extensions.Logging.File
             }
 
             internal FileFormatter Formatter { get; set; }
+
+            /// fallback setting to include scopes, deprecated API for setting this on the log provider
+            internal bool? FallbackIncludeScope { get; set; }
+            
+            internal string SubProviderName { get; set; }
+
             internal IExternalScopeProvider ScopeProvider { get; set; }
 
             [ThreadStatic]
@@ -42,7 +48,7 @@ namespace Bleess.Extensions.Logging.File
                 }
                 t_stringWriter ??= new StringWriter();
                 LogEntry<TState> logEntry = new LogEntry<TState>(logLevel, _name, eventId, state, exception, formatter);
-                Formatter.Write(in logEntry, ScopeProvider, t_stringWriter);
+                Formatter.Write(in logEntry, ScopeProvider, t_stringWriter, SubProviderName, FallbackIncludeScope);
 
                 var sb = t_stringWriter.GetStringBuilder();
                 if (sb.Length == 0)

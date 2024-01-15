@@ -6,7 +6,10 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+
+#nullable enable
 
 namespace Bleess.Extensions.Logging.File
 {
@@ -15,27 +18,43 @@ namespace Bleess.Extensions.Logging.File
     /// </summary>
     [ProviderAlias("Files")]
     public class CompositeFileLoggerProvider : ILoggerProvider, ISupportExternalScope, IDisposable
-    {
-        private readonly Dictionary<string, FileLoggerProvider> _providers;
-        private readonly ConcurrentDictionary<string, CompositeFileLogger> _loggers;
+    {   
+        private readonly ConcurrentDictionary<string, FileLoggerProvider> _providers; // sub providers
+        private readonly ConcurrentDictionary<string, CompositeFileLogger> _loggers; // logger cat -> composite logger
         private ConcurrentDictionary<string, FileFormatter> _formatters;
         private readonly IOptionsMonitor<FileLoggerOptions> _providerOptions;
-        private readonly IOptionsMonitor<CompositeLoggerFilterOptions> _filterOptions;
-        private readonly IDisposable? _change;
+        private readonly IOptionsMonitor<CompositeLoggerFilterOptions> _compositeFilterOptions;
+        private readonly IOptionsMonitor<LoggerFilterOptions> _filterOptions;
+
+        private LoggerFilterOptions _lastFilterOptions;
+        
+        private readonly IList<IDisposable?> _changeHandlers;
 
         private IExternalScopeProvider? _scopeProvider;
 
-        /// <inheritdoc/>
-        public CompositeFileLoggerProvider(IOptionsMonitor<CompositeFileLoggerProviderOptions> options, 
+        /// <summary>
+        /// Creates the composite file logger provider
+        /// </summary>
+        /// <param name="subLoggerProviderNames">list of names for registered sub providers in a composite</param>
+        /// <param name="providerOptions">Options for the provider (uses named options)</param>
+        /// <param name="compositeFilterOptions">Special composite (sub provider) level filter options (uses named options)</param>
+        /// <param name="filterOptions">Overall Filter options</param>
+        /// <param name="formatters">The registered file formatters</param>
+        public CompositeFileLoggerProvider(IEnumerable<ISubLoggerRegistration> subLoggerProviderNames,
             IOptionsMonitor<FileLoggerOptions> providerOptions,
-            IOptionsMonitor<CompositeLoggerFilterOptions> filterOptions,
+            IOptionsMonitor<CompositeLoggerFilterOptions> compositeFilterOptions,
+            IOptionsMonitor<LoggerFilterOptions> filterOptions,
             IEnumerable<FileFormatter> formatters)
         {
             // create all the providers
-            _providers = new Dictionary<string, FileLoggerProvider>();
-            _loggers = new ConcurrentDictionary<string, CompositeFileLogger>();
+            _providers = new ConcurrentDictionary<string, FileLoggerProvider>(); 
+            _loggers = new ConcurrentDictionary<string, CompositeFileLogger>(); 
+            _compositeFilterOptions = compositeFilterOptions; 
+            _filterOptions = filterOptions;
+            _lastFilterOptions = _filterOptions.CurrentValue;
 
-            _formatters = new ConcurrentDictionary<string, FileFormatter>();
+            _formatters = new ConcurrentDictionary<string, FileFormatter>(); 
+
             foreach (var f in formatters) 
             {
                 _formatters.TryAdd(f.Name, f);
@@ -43,10 +62,16 @@ namespace Bleess.Extensions.Logging.File
 
             _providerOptions = providerOptions;
 
-            var providers = options.CurrentValue.Providers;
-            _change = options.OnChange(OnCompositeChange);
+            var providers = subLoggerProviderNames.Select(p => p.Name).Distinct();
 
-            this.OnCompositeChange(options.CurrentValue);            
+            _changeHandlers = new List<IDisposable?>
+            {
+                compositeFilterOptions.OnChange(OnSubFiltersChange),
+                filterOptions.OnChange(OnBaseFiltersChange)
+            };
+
+            // create the sub providers
+            this.CreateSubProviders(providers);            
             
         }
 
@@ -55,13 +80,18 @@ namespace Bleess.Extensions.Logging.File
         {
             return _loggers.GetOrAdd(categoryName, cn => 
             {
-                var loggers = new List<FileLogger>();
+                var loggers = new List<SubFileLoggerInfo>();
                 foreach (var provider in _providers)
                 {
-                    loggers.Add((FileLogger)provider.Value.CreateLogger(categoryName));
+                    var logger = (FileLogger)provider.Value.CreateLogger(categoryName);
+                    logger.SubProviderName = provider.Key;
+                    CompositeLoggerRuleSelector.Select(CreateFilterOptionsForComposite(provider.Key), provider.Key, categoryName, out var minLevel, out var filter);
+                    var info = new SubFileLoggerInfo(logger, provider.Key, minLevel, filter);
+
+                    loggers.Add(info);
                 }
 
-                return new CompositeFileLogger(loggers, _scopeProvider);
+                return new CompositeFileLogger(categoryName, loggers, _scopeProvider);
 
             });
         }
@@ -69,7 +99,11 @@ namespace Bleess.Extensions.Logging.File
         /// <inheritdoc/>
         public void Dispose()
         {
-            _change?.Dispose();
+            foreach (var disposable in _changeHandlers) 
+            {
+                disposable?.Dispose();
+            }
+
             _loggers.Clear();
             if (_providers != null)
             {
@@ -78,44 +112,98 @@ namespace Bleess.Extensions.Logging.File
                     provider.Value.Dispose();
                 }
             }
-            _providers.Clear();
+            _providers?.Clear();
         }
 
         /// <inheritdoc/>
         public void SetScopeProvider(IExternalScopeProvider scopeProvider)
         {
+            _scopeProvider = scopeProvider;
+
             foreach (var provider in _providers)
             {
                 provider.Value.SetScopeProvider(scopeProvider);
             }
         }
 
-        private void OnCompositeChange(CompositeFileLoggerProviderOptions options)
+        private void OnSubFiltersChange(CompositeLoggerFilterOptions options, string? subProviderName) 
+        {
+            // apply the filters
+            ApplyFilters(subProviderName);
+        }
+
+        private void OnBaseFiltersChange(LoggerFilterOptions options)
+        {
+            // apply the filters
+            if (!options.Equals(_lastFilterOptions))
+            {
+                // todo: this could be more effient to actually see if anything has changed
+                ApplyFilters(null);
+                _lastFilterOptions = options;
+            }
+        }
+
+        private void CreateSubProviders(IEnumerable<string> subProviders)
         {
             // add new providers
-            if (options.Providers != null)
+            if (subProviders != null)
             {
-                foreach (var p in options.Providers)
+                foreach (var p in subProviders)
                 {
                     if (!_providers.ContainsKey(p))
                     {
-                        _providers.Add(p, new FileLoggerProvider(_providerOptions, _formatters.Values, p));
+                        _providers.TryAdd(p, new FileLoggerProvider(_providerOptions, _formatters.Values, p));
                     }
                 }
             }
+        }
 
-            // delete removed ones
-            foreach (var provider in _providers.ToArray()) 
+        private LoggerFilterOptions CreateFilterOptionsForComposite(string subProvider) 
+        {
+            var options = _filterOptions.CurrentValue;
+            var clone = new LoggerFilterOptions
             {
-                if (!options.Providers.Contains(provider.Key)) 
-                {
-                    _providers.Remove(provider.Key);
-                    provider.Value.Dispose();
+                CaptureScopes = options.CaptureScopes,
+                MinLevel = options.MinLevel,
+            };
 
-                }
+            foreach (var rule in options.Rules.Where(r => r.ProviderName == null)) 
+            {
+                clone.Rules.Add(rule);
             }
 
-            
+            var subProviderRules = _compositeFilterOptions.Get(subProvider);
+
+
+            foreach (var rule in subProviderRules.Rules)
+            {
+                clone.Rules.Add(rule);
+            }
+
+            return clone;
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public void ApplyFilters(string? subProviderName) 
+        {
+            foreach (var logger in _loggers) 
+            {
+                // update the info
+                if (logger.Value is CompositeFileLogger compositeLogger) 
+                {
+                    var loggerInfos = subProviderName == null ? compositeLogger.SubLoggers : compositeLogger.SubLoggers.Where(p => p.SubProviderName == subProviderName);
+
+                    foreach (var info in loggerInfos)
+                    {
+                        CompositeLoggerRuleSelector.Select(CreateFilterOptionsForComposite(info.SubProviderName), info.SubProviderName, compositeLogger.Category, out var minLevel, out var filter);
+
+                        // update the composite logger
+                        compositeLogger.Update(info.SubProviderName, minLevel, filter);
+                    }
+                }
+            }
         }
         
     }

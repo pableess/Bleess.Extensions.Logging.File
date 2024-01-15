@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -7,45 +8,91 @@ using System.Threading.Tasks;
 
 #nullable enable
 
-namespace Bleess.Extensions.Logging.File
-{
-    internal sealed class CompositeFileLogger : ILogger
+namespace Bleess.Extensions.Logging.File;
+
+internal sealed class CompositeFileLogger : ILogger
+{   
+    private readonly ConcurrentDictionary<string, SubFileLoggerInfo> _loggers;
+    private IExternalScopeProvider? _scopeProvider;
+
+    public CompositeFileLogger(string category, IEnumerable<SubFileLoggerInfo> loggers, IExternalScopeProvider? scopeProvider)
     {
-        private readonly IEnumerable<FileLogger> _loggers;
-        private IExternalScopeProvider? _scopeProvider;
+        Category = category;
+        _scopeProvider = scopeProvider;
+        _loggers = new ConcurrentDictionary<string, SubFileLoggerInfo>(loggers.ToDictionary(l => l.SubProviderName, l => l)) ?? throw new ArgumentNullException(nameof(loggers));
+    }
 
-        public CompositeFileLogger(IEnumerable<FileLogger> loggers, IExternalScopeProvider? scopeProvider)
+    /// <summary>
+    /// Gets the category
+    /// </summary>
+    public string Category { get; }
+
+    /// <summary>
+    /// Gets the sub loggers
+    /// </summary>
+    public IEnumerable<SubFileLoggerInfo> SubLoggers => _loggers.Values;
+
+    public void Update(string provider, LogLevel? minLogLevel, Func<string?, string?, LogLevel, bool>? filter) 
+    {
+        if (_loggers.TryGetValue(provider, out var cur))
         {
-            _scopeProvider = scopeProvider;
-            _loggers = loggers ?? throw new ArgumentNullException(nameof(loggers));
+            var newVal = new SubFileLoggerInfo(cur.Logger, cur.SubProviderName, minLogLevel, filter);
+            _loggers.TryUpdate(provider, newVal, cur);
         }
+    }
 
-        internal IExternalScopeProvider? ScopeProvider 
+    public void Add(SubFileLoggerInfo info)
+    {
+        _loggers.TryAdd(info.SubProviderName, info);
+    }
+    public void Add(string providerKey)
+    {
+        _loggers.TryRemove(providerKey, out _);
+    }
+
+
+    internal IExternalScopeProvider? ScopeProvider 
+    {
+        get => _scopeProvider;
+        set
         {
-            get => _scopeProvider;
-            set
+            _scopeProvider = value;
+            foreach (var logger in _loggers.Values)
             {
-                _scopeProvider = value;
-                foreach (var logger in _loggers)
-                {
-                    logger.ScopeProvider = value;
-                }
-            }
-        }
-
-        public IDisposable BeginScope<TState>(TState state) where TState : notnull => ScopeProvider?.Push(state) ?? NullScope.Instance;
-
-        public bool IsEnabled(LogLevel logLevel) => _loggers.Any(l => l.IsEnabled(logLevel));
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception, string> formatter)
-        {
-            foreach (var logger in _loggers) 
-            {
-                if (logger.IsEnabled(logLevel))
-                {
-                    logger.Log(logLevel, eventId, state, exception, formatter);
-                }
+                logger.Logger.ScopeProvider = value;
             }
         }
     }
+
+    public IDisposable BeginScope<TState>(TState state) where TState : notnull => ScopeProvider?.Push(state) ?? NullScope.Instance;
+
+    public bool IsEnabled(LogLevel logLevel) => _loggers.Values.All(l => IsEnabled(l, logLevel));
+
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception, string> formatter)
+    {
+        foreach (var logger in _loggers.Values) 
+        {
+            if (IsEnabled(logger, logLevel))
+            {
+                logger.Logger.Log(logLevel, eventId, state, exception, formatter);
+            }
+        }
+    }
+
+    private bool IsEnabled(SubFileLoggerInfo info, LogLevel level)
+    {
+        if (info.MinLevel != null && info.MinLevel > level)
+        {
+            return false;
+        }
+
+        if (info.Filter != null && !info.Filter(info.SubProviderName, this.Category, level))
+        {
+            return false;
+        }
+
+        return true;
+
+    }
+
 }

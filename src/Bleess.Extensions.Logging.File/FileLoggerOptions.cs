@@ -5,7 +5,7 @@ namespace Bleess.Extensions.Logging.File
     /// <summary>
     /// Options for FileLogger.
     /// </summary>
-    public class FileLoggerOptions
+    public record class FileLoggerOptions
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="FileLoggerOptions"/> class.
@@ -17,6 +17,7 @@ namespace Bleess.Extensions.Logging.File
         /// <summary>
         /// Include scopes in the log output
         /// </summary>
+        [System.ObsoleteAttribute("FileLoggerOptions.IncludeScopes has been deprecated. Use FileFormatterOptions.IncludeScopes instead.")]
         public bool IncludeScopes { get; set; } = true;
 
 
