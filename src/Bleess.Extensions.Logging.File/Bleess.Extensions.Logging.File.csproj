@@ -4,20 +4,24 @@
 		<TargetFrameworks>net8.0;net7.0;net6.0;net5.0</TargetFrameworks>
 		<LangVersion>latest</LangVersion>
 
+    <RepoRoot>$([System.IO.Path]::GetDirectoryName($([MSBuild]::GetPathOfFileAbove('.gitignore', '$(MSBuildThisFileDirectory)'))))</RepoRoot>
+
+    <Deterministic>true</Deterministic>
+    
 		<VersionPrefix>2.0.0</VersionPrefix>
     <VersionSuffix>rc1</VersionSuffix>
 
 		<Authors>Paul Bleess</Authors>
 		<Description>Simple file logger for dotnet Microsoft.Extensions.Logging</Description>
 		<Title>File logging for Microsoft.Extensions.Logging</Title>
-		<Copyright>Copyright (c) 2020 Paul Bleess and contributors</Copyright>
+		<Copyright>Copyright (c) 2024 Paul Bleess and contributors</Copyright>
 		<AssemblyTitle>Bleess.Extensions.Logging.File</AssemblyTitle>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<AssemblyName>Bleess.Extensions.Logging.File</AssemblyName>
 		<PackageId>Bleess.Extensions.Logging.File</PackageId>
 		<PackageTags>microsoft-extensions-logging;log;file;logging;aspnetcore;file-logger;logging-provider;netstandard;netcore</PackageTags>
 		<PackageProjectUrl>https://github.com/pableess/Bleess.Extensions.Logging.File</PackageProjectUrl>
-		<PackageLicenseUrl>https://raw.githubusercontent.com/pableess/Bleess.Extensions.Logging.File/master/LICENSE</PackageLicenseUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReleaseNotes>
 			How to use: https://github.com/pableess/Bleess.Extensions.Logging.File
 
@@ -29,13 +33,35 @@
 			- Dedicated file writing thread for high log throughput and performance
 
 		</PackageReleaseNotes>
+
+
+    <!-- Publish the repository URL in the built .nupkg (in the NuSpec <Repository> element) -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <!-- Embed source files that are not tracked by the source control manager in the PDB -->
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <!-- Recommended: Embed symbols containing Source Link in the main file (exe/dll) -->
+    <DebugType>embedded</DebugType>
+
+    
+    <!--<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>-->
 	</PropertyGroup>
+
+  <PropertyGroup Condition="'$(TF_BUILD)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
 
 	<ItemGroup>
 		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
 			<_Parameter1>Tests</_Parameter1>
 		</AssemblyAttribute>
 	</ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+  </ItemGroup>
 
 	<ItemGroup Condition="$(TargetFramework) == 'netstandard2.0'">
 		<PackageReference Include="Microsoft.Extensions.Logging" Version="3.0.0" />
