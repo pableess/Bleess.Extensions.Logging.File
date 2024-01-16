@@ -89,7 +89,8 @@ namespace Bleess.Extensions.Logging.File
             // so there is no need for a "manual" check first.
             fileInfo.Directory.Create();
 
-            logFileStream = new FileStream(rollingFileInfo.CurrentFile, FileMode.OpenOrCreate, FileAccess.Write);
+            // wrap the file stream with a stream that tracks the size without an p/invoke on every .Lenght reference
+            logFileStream = new FileStream(rollingFileInfo.CurrentFile, FileMode.OpenOrCreate, FileAccess.Write).ToWriteCountingStream();
             if (append)
             {
                 logFileStream.Seek(0, SeekOrigin.End);
@@ -114,7 +115,7 @@ namespace Bleess.Extensions.Logging.File
 
             if (rollingFileInfo.ShouldDateRoll() || sizeExceeded)
             {
-                Close();
+                Close(); // close the current file before rolling to new one
 
                 // if not rolling based on a date, then roll the sequence number back to 0
                 int? maxSequence = this.RollInterval == RollingInterval.Infinite ? this.maxRollingFiles : null;
@@ -143,6 +144,11 @@ namespace Bleess.Extensions.Logging.File
             {
                 if (iterator.MoveNext())
                 {
+                    if (iterator.Current.FullName == new FileInfo(rollingFileInfo.CurrentFile).FullName)
+                    {
+                        System.Diagnostics.Debug.Fail("Error");
+                    }
+
                     try
                     {
                         iterator.Current.Delete();
@@ -168,7 +174,9 @@ namespace Bleess.Extensions.Logging.File
                     checkExtraFiles = false;
                 }
 
+                // write the message
                 logFileWriter.WriteLine(message);
+
                 if (flush)
                     logFileWriter.Flush();
             }

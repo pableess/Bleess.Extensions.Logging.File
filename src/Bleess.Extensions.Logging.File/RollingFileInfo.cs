@@ -24,6 +24,7 @@ internal class RollingFileInfo
     private string _formatted;
     private string _filePathTemplateWithoutExtension;
     private string _extension;
+
     int _fileSequence = 0;
     
 
@@ -40,6 +41,10 @@ internal class RollingFileInfo
         var expanded = Environment.ExpandEnvironmentVariables(template);
         _extension = Path.GetExtension(expanded) ?? ".txt";
         _filePathTemplateWithoutExtension = Path.ChangeExtension(expanded, null);
+
+        // get the output template
+        
+
 
         // set the current date/time 
         _currentInterval = this.Now.Truncate(_rollInterval);
@@ -98,8 +103,7 @@ internal class RollingFileInfo
         {
             var lastFileInfo = logFiles
                     .Select(fName => new FileInfo(fName))
-                    .OrderByDescending(fInfo => Path.GetFileNameWithoutExtension(fInfo.Name))
-                    .ThenByDescending(fInfo => fInfo.LastWriteTime).First();
+                    .OrderByDescending(fInfo => fInfo.LastWriteTime).First();
 
             var current = Path.GetFileName(GetFileName(_currentInterval, 0));
 
@@ -115,13 +119,18 @@ internal class RollingFileInfo
                 }
                 else 
                 {
-                    int.TryParse(lastFileName.Substring(index + 1), out _fileSequence);
+                    // if the file has a sequence num, try to parse it
+                    if (CountSubstring(lastFileName, Separator) == 2)
+                    {
+                        int.TryParse(lastFileName.Substring(index + 1), out _fileSequence);
 
-                    // update the cached formatted file name
-                    _formatted = GetFileName(_currentInterval, _fileSequence);
+                        // update the cached formatted file name
+                        _formatted = GetFileName(_currentInterval, _fileSequence);
+                        return true;
+                    }
                 }
 
-                return true;
+           
             }
         }
 
@@ -145,7 +154,8 @@ internal class RollingFileInfo
             // this only happens when reducing the file size
             var matchingFiles = Directory.GetFiles(logDir, logFileMask, SearchOption.TopDirectoryOnly).Select(f => new FileInfo(f));
 
-            return matchingFiles.OrderBy(f => Path.GetFileNameWithoutExtension(f.Name)).ThenBy(f => f.LastWriteTimeUtc).ToArray();
+            // currently just sorting using last write time
+            return matchingFiles.OrderBy(f => f.LastWriteTimeUtc).ToArray();
         }
 
         return Array.Empty<FileInfo>();
@@ -177,4 +187,16 @@ internal class RollingFileInfo
         // set the formatted file path
         return Path.ChangeExtension(builder.ToString(), _extension);
     }
+
+    public static int CountSubstring(string text, string value)
+    {
+        int count = 0, minIndex = text.IndexOf(value, 0);
+        while (minIndex != -1)
+        {
+            minIndex = text.IndexOf(value, minIndex + value.Length);
+            count++;
+        }
+        return count;
+    }
+
 }

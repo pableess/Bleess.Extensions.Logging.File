@@ -39,6 +39,7 @@ Below is a sample configuration for the file provider.  The values shown are the
     "File": {    
       "IncludeScopes": true,   // this is can also be set in the formatter options
       "Path": "logs/log.txt",  // can contain environment variables
+      "RollInteral" : "Infinite", // can be (Year, Month, Day, Hour) appends _yyyyMMddHH to the file name
       "MaxNumberFiles": 7,
       "MaxFileSizeInMB": 50,  // this can be decimal
       "FormatterName": "simple",  // simple or json
