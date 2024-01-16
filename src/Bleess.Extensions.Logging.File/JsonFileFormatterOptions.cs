@@ -8,8 +8,11 @@ namespace Bleess.Extensions.Logging.File
     /// <summary>
     /// Options for the built-in json console log formatter.
     /// </summary>
-    public class JsonFileFormatterOptions : FileFormatterOptions
+    public record class JsonFileFormatterOptions : FileFormatterOptions
     {
+        /// <summary>
+        /// Creates <see cref="JsonFileFormatterOptions"/>
+        /// </summary>
         public JsonFileFormatterOptions() { }
 
         /// <summary>

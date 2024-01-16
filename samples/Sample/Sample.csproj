@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Bleess.Extensions.Logging.File\Bleess.Extensions.Logging.File.csproj" />
+    <ProjectReference Include="..\..\src\Bleess.Extensions.Logging.File\Bleess.Extensions.Logging.File.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Bleess.Extensions.Logging.File;
@@ -12,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 
 namespace Tests
 {
@@ -111,8 +111,8 @@ namespace Tests
                 p.Dispose();
 
                 Assert.IsTrue(File.Exists($"logs/{filename}.txt"));
-                Assert.IsTrue(File.Exists($"logs/{filename}1.txt"));
-                Assert.IsTrue(File.Exists($"logs/{filename}2.txt"));
+                Assert.IsTrue(File.Exists($"logs/{filename}_001.txt"));
+                Assert.IsTrue(File.Exists($"logs/{filename}_002.txt"));
 
                 // file size can be a little bit bigger because size isn't exceed until next write
                 Assert.IsTrue(new FileInfo(filepath).Length <= (1024 * 1024 * 0.13f));
@@ -123,8 +123,8 @@ namespace Tests
                 try
                 {
                     File.Delete($"logs/{filename}.txt");
-                    File.Delete($"logs/{filename}1.txt");
-                    File.Delete($"logs/{filename}2.txt");
+                    File.Delete($"logs/{filename}_001.txt");
+                    File.Delete($"logs/{filename}_002.txt");
                 }
                 catch (Exception) { }
             }

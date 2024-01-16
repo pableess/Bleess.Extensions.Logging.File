@@ -1,47 +1,95 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;</TargetFrameworks>
-    <LangVersion>8.0</LangVersion>
+	<PropertyGroup>
+		<TargetFrameworks>net8.0;net7.0;net6.0;net5.0</TargetFrameworks>
+		<LangVersion>latest</LangVersion>
 
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <RepoRoot>$([System.IO.Path]::GetDirectoryName($([MSBuild]::GetPathOfFileAbove('.gitignore', '$(MSBuildThisFileDirectory)'))))</RepoRoot>
 
-    <Authors>Paul Bleess</Authors>
-    <Description>Simple file logger for dotnet Microsoft.Extensions.Logging</Description>
-    <Title>File logging for Microsoft.Extensions.Logging</Title>
-    <Copyright>Copyright (c) 2020 Paul Bleess and contributors</Copyright>
-    <AssemblyTitle>Bleess.Extensions.Logging.File</AssemblyTitle>
-    <TargetFrameworks>netstandard2.0</TargetFrameworks>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <AssemblyName>Bleess.Extensions.Logging.File</AssemblyName>
-    <PackageId>Bleess.Extensions.Logging.File</PackageId>
-    <PackageTags>microsoft-extensions-logging;log;file;logging;aspnetcore;file-logger;logging-provider;netstandard;netcore</PackageTags>
-    <PackageProjectUrl>https://github.com/pableess/Bleess.Extensions.Logging.File</PackageProjectUrl>
-    <PackageLicenseUrl>https://raw.githubusercontent.com/pableess/Bleess.Extensions.Logging.File/master/LICENSE</PackageLicenseUrl>
-    <PackageReleaseNotes>
-      How to use: https://github.com/pableess/Bleess.Extensions.Logging.File
+    <Deterministic>true</Deterministic>
+    
+		<VersionPrefix>2.0.0</VersionPrefix>
+    <VersionSuffix>rc1</VersionSuffix>
 
-      Initial Release 1.0.0
-       - Basic file logging features: rolling files, maximum file length, max number of files, etc
-       - Simple text and json formatters with options for single line, multi-line, and separated log statements
-       - Support for logging scopes
-       - Support for idiomatic microsoft.extensions.logging configuration
-       - Ability to reconfigure/change settings without restarting application
-       - Asynchronous log file writing for high log throughput and performance
-       - Current support for ms.extensions 3.x and greater
-       
-    </PackageReleaseNotes>
+		<Authors>Paul Bleess</Authors>
+		<Description>Simple file logger for dotnet Microsoft.Extensions.Logging</Description>
+		<Title>File logging for Microsoft.Extensions.Logging</Title>
+		<Copyright>Copyright (c) 2024 Paul Bleess and contributors</Copyright>
+		<AssemblyTitle>Bleess.Extensions.Logging.File</AssemblyTitle>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<AssemblyName>Bleess.Extensions.Logging.File</AssemblyName>
+		<PackageId>Bleess.Extensions.Logging.File</PackageId>
+		<PackageTags>microsoft-extensions-logging;log;file;logging;aspnetcore;file-logger;logging-provider;netstandard;netcore</PackageTags>
+		<PackageProjectUrl>https://github.com/pableess/Bleess.Extensions.Logging.File</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PackageReleaseNotes>
+			How to use: https://github.com/pableess/Bleess.Extensions.Logging.File
+
+			- Basic file logging features: rolling files, maximum file length, max number of files, etc
+			- Simple text and json formatters with options for single line, multi-line, and separated log statements
+			- Support for logging scopes
+			- Support for idiomatic configuration via IConfiguration sources or in code
+			- Ability to change settings without restarting application
+			- Dedicated file writing thread for high log throughput and performance
+
+		</PackageReleaseNotes>
+
+
+    <!-- Publish the repository URL in the built .nupkg (in the NuSpec <Repository> element) -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <!-- Embed source files that are not tracked by the source control manager in the PDB -->
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <!-- Recommended: Embed symbols containing Source Link in the main file (exe/dll) -->
+    <DebugType>embedded</DebugType>
+
+    
+    <!--<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>-->
+	</PropertyGroup>
+
+  <PropertyGroup Condition="'$(TF_BUILD)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
-  <ItemGroup>
-    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
-      <_Parameter1>Tests</_Parameter1>
-    </AssemblyAttribute>
-  </ItemGroup>
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+			<_Parameter1>Tests</_Parameter1>
+		</AssemblyAttribute>
+	</ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="3.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="3.0.0" />
-    <PackageReference Include="System.Text.Json" Version="4.7.2" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+  </ItemGroup>
+
+	<ItemGroup Condition="$(TargetFramework) == 'netstandard2.0'">
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="3.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="3.0.0" />
+		<PackageReference Include="System.Text.Json" Version="4.7.2" />
+	</ItemGroup>
+
+	<ItemGroup Condition="$(TargetFramework) == 'net8.0'">
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="8.0.0" />
+		<PackageReference Include="System.Text.Json" Version="8.0.1" />
+	</ItemGroup>
+
+  <ItemGroup Condition="$(TargetFramework) == 'net7.0'">
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="7.0.0" />
+    <PackageReference Include="System.Text.Json" Version="7.0.4" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$(TargetFramework) == 'net6.0'">
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="6.0.0" />
+    <PackageReference Include="System.Text.Json" Version="6.0.9" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$(TargetFramework) == 'net5.0'">
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="5.0.0" />
+    <PackageReference Include="System.Text.Json" Version="5.0.2" />
   </ItemGroup>
 </Project>

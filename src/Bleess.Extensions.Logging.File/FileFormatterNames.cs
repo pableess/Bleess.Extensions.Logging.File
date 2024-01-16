@@ -4,6 +4,9 @@ using System.Text;
 
 namespace Bleess.Extensions.Logging.File
 {
+    /// <summary>
+    /// File formatter names
+    /// </summary>
     public class FileFormatterNames
     {
         /// <summary>
