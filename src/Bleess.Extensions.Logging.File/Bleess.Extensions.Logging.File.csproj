@@ -46,7 +46,7 @@
     <DebugType>embedded</DebugType>
 
     
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <!--<ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>-->
 	</PropertyGroup>
 
   <ItemGroup>
