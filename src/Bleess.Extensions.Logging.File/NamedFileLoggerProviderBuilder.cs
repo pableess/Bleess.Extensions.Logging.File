@@ -39,7 +39,7 @@ public sealed class NamedFileLoggerProviderBuilder
     /// </summary>
     /// <param name="configure">Configuration delegate</param>
     /// <returns></returns>
-    public NamedFileLoggerProviderBuilder WithJsonFormatter(Action<JsonFileFormatterOptions> configure = null)
+    public NamedFileLoggerProviderBuilder WithJsonFormatter(Action<JsonFileFormatterOptions>? configure = null)
     {
         _builder.Services.Configure<FileLoggerOptions>(_providerAlias, c => c.FormatterName = FileFormatterNames.Json);
         if (configure != null)

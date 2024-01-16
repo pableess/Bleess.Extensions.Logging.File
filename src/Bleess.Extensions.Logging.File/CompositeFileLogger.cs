@@ -64,7 +64,15 @@ internal sealed class CompositeFileLogger : ILogger
         }
     }
 
-    public IDisposable BeginScope<TState>(TState state) where TState : notnull => ScopeProvider?.Push(state) ?? NullScope.Instance;
+    IDisposable ILogger.BeginScope<TState>(TState state)
+    {
+        if (ScopeProvider == null) 
+        {
+            return NullScope.Instance;
+        }
+
+        return ScopeProvider.Push(state);
+    }
 
     public bool IsEnabled(LogLevel logLevel) => _loggers.Values.All(l => IsEnabled(l, logLevel));
 

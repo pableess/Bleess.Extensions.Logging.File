@@ -55,28 +55,31 @@ namespace Tests
         {
             var random = Path.ChangeExtension(Path.GetRandomFileName(), null);
 
-            Directory.CreateDirectory($"data/{random}");
+            Directory.CreateDirectory($"logs/{random}");
 
-            File.AppendText($"data/{random}/foo_{DateTime.Now.Subtract(TimeSpan.FromDays(1)).ToString("yyyyMMddHH")}.json").Close();
-            File.AppendText($"data/{random}/foo_{DateTime.Now.ToString("yyyyMMddHH")}_003.json")?.Close();
-            File.AppendText($"data/{random}/foo_{DateTime.Now.ToString("yyyyMMddHH")}_002.json")?.Close();
+            // alg uses last write timestamp, so write them in order
+            File.AppendText($"logs/{random}/foo_{DateTime.Now.Subtract(TimeSpan.FromDays(1)).ToString("yyyyMMddHH")}.json").Close();
+            Thread.Sleep(50);
 
-            Thread.Sleep(50); // wait for FS sync
+            File.AppendText($"logs/{random}/foo_{DateTime.Now.ToString("yyyyMMddHH")}_001.json")?.Close();
+            Thread.Sleep(50);
+
+            File.AppendText($"logs/{random}/foo_{DateTime.Now.ToString("yyyyMMddHH")}_002.json")?.Close();
 
             try
             {
-                RollingFileInfo info = new RollingFileInfo($"data/{random}/foo.json", RollingInterval.Hour, false);
+                RollingFileInfo info = new RollingFileInfo($"logs/{random}/foo.json", RollingInterval.Hour, false);
 
                 var result = info.AlignToDirectory();
 
                 Assert.IsTrue(result);
-                Assert.AreEqual(3, info.FileSequence);
-                Assert.AreEqual($"data/{random}/foo_{DateTime.Now.ToString("yyyyMMddHH")}_003.json", info.CurrentFile);
+                Assert.AreEqual(2, info.FileSequence);
+                Assert.AreEqual($"logs/{random}/foo_{DateTime.Now.ToString("yyyyMMddHH")}_002.json", info.CurrentFile);
 
             }
             finally 
             {
-                Directory.Delete($"data/{random}", true);
+                Directory.Delete($"logs/{random}", true);
             }
         }
 
@@ -86,28 +89,31 @@ namespace Tests
         {
             var random = Path.ChangeExtension(Path.GetRandomFileName(), null);
 
-            Directory.CreateDirectory($"data/{random}");
+            Directory.CreateDirectory($"logs/{random}");
 
-            File.AppendText($"data/{random}/foo.json")?.Close();
-            File.AppendText($"data/{random}/foo_003.json")?.Close();
-            File.AppendText($"data/{random}/foo_002.json")?.Close();
+            // alg uses last write timestamp, so write them in order
+            File.AppendText($"logs/{random}/foo.json")?.Close();
+            Thread.Sleep(50);
+            File.AppendText($"logs/{random}/foo_002.json")?.Close();
+            Thread.Sleep(50);
+            File.AppendText($"logs/{random}/foo_003.json")?.Close();
 
-            Thread.Sleep(50); // wait for FS sync
+           
 
             try
             {
-                RollingFileInfo info = new RollingFileInfo($"data/{random}/foo.json", RollingInterval.Infinite, false);
+                RollingFileInfo info = new RollingFileInfo($"logs/{random}/foo.json", RollingInterval.Infinite, false);
 
                 var result = info.AlignToDirectory();
 
                 Assert.IsTrue(result);
                 Assert.AreEqual(3, info.FileSequence);
-                Assert.AreEqual($"data/{random}/foo_003.json", info.CurrentFile);
+                Assert.AreEqual($"logs/{random}/foo_003.json", info.CurrentFile);
 
             }
             finally
             {
-                Directory.Delete($"data/{random}", true);
+                Directory.Delete($"logs/{random}", true);
             }
         }
 

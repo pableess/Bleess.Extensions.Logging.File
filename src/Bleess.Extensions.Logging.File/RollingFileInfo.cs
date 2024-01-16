@@ -120,17 +120,17 @@ internal class RollingFileInfo
                 else 
                 {
                     // if the file has a sequence num, try to parse it
-                    if (CountSubstring(lastFileName, Separator) == 2)
+                    var fileSeq = lastFileName.Substring(index + 1);
+
+                    if (fileSeq.Length == SequenceFormat.Length)
                     {
-                        int.TryParse(lastFileName.Substring(index + 1), out _fileSequence);
+                        int.TryParse(fileSeq, out _fileSequence);
 
                         // update the cached formatted file name
                         _formatted = GetFileName(_currentInterval, _fileSequence);
                         return true;
                     }
                 }
-
-           
             }
         }
 
