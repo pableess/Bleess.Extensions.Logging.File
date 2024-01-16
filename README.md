@@ -143,7 +143,8 @@ Example configuration
 
 
 ## Rolling Behavior
- Log files can have a max file size at which time a new file will be create with a incremented id appended.  You may also specify a maximum number of files to retain.  Once the maximum number of files has been reteached the oldest will be overwritten.
+ Log files can have a max file size at which time a new file will be create with a incremented id appended.  You may also specify a maximum number of files to retain.  Once the maximum number of files has been reached, the oldest will be overwritten.
+ Using RollInterval setting, you can also specify that a date will be appended to the file name and the files will roll according to the date in 'yyyyMMddHH' format.
 
 ## Credits
  - Most of the code was a adapted from dotnet source code (specifically Microsoft.Extensions.Logging.Console) https://github.com/dotnet/runtime/tree/master/src/libraries/Microsoft.Extensions.Logging.Console
