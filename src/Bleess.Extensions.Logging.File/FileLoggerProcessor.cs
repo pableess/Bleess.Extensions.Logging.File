@@ -56,14 +56,14 @@ namespace Bleess.Extensions.Logging.File
             {
 
                 // if the file path didn't change, just update the limits
-                if (this._writer != null && this._writer?.FilePath == options.ExpandedPath)
+                if (this._writer != null && this._writer?.FilePath == options.Path && this._writer.RollInterval == options.RollInterval)
                 {
                     this._writer.SetLimits(options.MaxFileSizeInBytes, options.MaxNumberFiles);
                 }
                 else
                 {
                     // else swap out the writer and close the old one 
-                    var newWriter = new FileWriter(options.ExpandedPath, options.MaxFileSizeInBytes, options.MaxNumberFiles, options.Append);
+                    var newWriter = new FileWriter(options.Path, options.MaxFileSizeInBytes, options.MaxNumberFiles, options.Append, options.RollInterval);
 
                     FileWriter oldWriter = Interlocked.Exchange(ref this._writer, newWriter) as FileWriter;
 

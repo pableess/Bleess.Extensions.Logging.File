@@ -35,8 +35,6 @@ namespace Bleess.Extensions.Logging.File
         /// </value>
         public string Path { get; set; } = "logs/log.txt";
 
-        internal string ExpandedPath => Environment.ExpandEnvironmentVariables(Path);
-
         /// <summary>
         /// Gets or sets the MaxFileSizeInMB.
         /// </summary>
@@ -52,6 +50,11 @@ namespace Bleess.Extensions.Logging.File
         /// The MaxNumberFiles.
         /// </value>
         public int MaxNumberFiles { get; set; } = 7;
+
+        /// <summary>
+        /// Gets or sets the rolling interval
+        /// </summary>
+        public RollingInterval RollInterval { get; set; } = RollingInterval.Infinite;
 
         /// <summary>
         /// Whether or not to append to and existing file

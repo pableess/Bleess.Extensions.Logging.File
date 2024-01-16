@@ -9,6 +9,12 @@
 	<ItemGroup>
 		<None Remove="appsettings.json" />
 		<None Remove="configTest.json" />
+		<None Remove="data\log.txt" />
+		<None Remove="data\log_001.txt" />
+		<None Remove="data\log_002.txt" />
+		<None Remove="data\sample_20240115.txt" />
+		<None Remove="data\sample_20240116.txt" />
+		<None Remove="data\sample_20240116_001.txt" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -17,6 +23,24 @@
 		</Content>
 		<Content Include="configTest.json">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="data\log.txt">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="data\log_001.txt">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="data\log_002.txt">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="data\sample_20240116_001.txt">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="data\sample_20240115.txt">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<Content Include="data\sample_20240116.txt">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
 	</ItemGroup>
 

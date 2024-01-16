@@ -17,7 +17,7 @@ namespace Tests
         {
             try
             {
-                FileWriter w = new FileWriter("logs/fw.txt", 1024, 4, false);
+                FileWriter w = new FileWriter("logs/fw.txt", 1024, 4, false, RollingInterval.Infinite);
 
                 for (int i = 0; i < 5000; i++)
                 {
