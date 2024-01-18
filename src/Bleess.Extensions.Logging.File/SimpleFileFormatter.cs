@@ -11,49 +11,27 @@ using System.Threading;
 
 namespace Bleess.Extensions.Logging.File;
 
-internal class SimpleFileFormatter : FileFormatter, IDisposable
+internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
 {
     private const string LoglevelPadding = ": ";
     private static readonly string _messagePadding = new string(' ', GetLogLevelString(LogLevel.Information).Length + LoglevelPadding.Length);
     private static readonly string _newLineWithMessagePadding = Environment.NewLine + _messagePadding;
-    private IDisposable? _optionsReloadToken;
-    private readonly IOptionsMonitor<SimpleFileFormatterOptions> _options;
-    private ConcurrentDictionary<string, SimpleFileFormatterOptions> _cachedOptions; // cache options per sub provider
 
+    /// <summary>
+    /// Create a <see cref="SimpleFileFormatter"/>
+    /// </summary>
+    /// <param name="options"></param>
     public SimpleFileFormatter(IOptionsMonitor<SimpleFileFormatterOptions> options)
-        : base(FileFormatterNames.Simple)
+        : base(FileFormatterNames.Simple, options)
     {
-        _options = options;
-        _cachedOptions = new ConcurrentDictionary<string, SimpleFileFormatterOptions>();
-        _optionsReloadToken = options.OnChange(ReloadLoggerOptions);
-    }
-
-    private void ReloadLoggerOptions(SimpleFileFormatterOptions options, string? subProviderName)
-    {
-        var provider = subProviderName ?? DefaultOptionsKey;
-
-        _cachedOptions.AddOrUpdate(provider, options, (s, o) => options);
-    }
-
-    private SimpleFileFormatterOptions GetFormatterOption(string? subProviderName, bool? fallbackIncludeScopes)
-    {
-        var name = subProviderName ?? DefaultOptionsKey;
-
-        var formatterOptions = _cachedOptions.GetOrAdd(name, _options.Get(name));
-
-        formatterOptions.IncludeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScopes;
-
-        return formatterOptions;
-    }
-
-    public void Dispose()
-    {
-        _optionsReloadToken?.Dispose();
     }
 
     public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider scopeProvider, TextWriter textWriter, string? subProviderName = null, bool? fallbackIncludeScope = null)
     {
-        var formatterOptions = GetFormatterOption(subProviderName, fallbackIncludeScope);
+        var formatterOptions = this.GetOptions(subProviderName);
+
+        // support obsolete include scope from the provider config, if not set on the formatter
+        formatterOptions.IncludeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScope;
 
         string message = logEntry.Formatter(logEntry.State, logEntry.Exception);
         if (logEntry.Exception == null && message == null)

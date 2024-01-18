@@ -20,25 +20,25 @@ namespace Sample
                     l.AddConsole(c => { c.IncludeScopes = true; });
                     l.AddFile(); // default log file
 
-                    l.AddFiles(b =>
-                    {
-                        // example adding log provider, will use settings in configuration
-                        b.AddFile("TraceLog");
+                    //l.AddFiles(b =>
+                    //{
+                    //    // example adding log provider, will use settings in configuration
+                    //    b.AddFile("TraceLog");
 
-                        // example configuration certain properties in code, which would override config settings
-                        b.AddFile("ErrorLog")
-                            .WithOptions(o =>
-                            {
-                                o.Path = "logs/errors.json";
-                            })
-                            .WithJsonFormatter(o =>
-                            {
-                                o.IncludeScopes = true;
-                                o.EmptyLineBetweenMessages = false;
-                                o.TimestampFormat = "dd h:mm tt";
-                            })
-                            .WithMinLevel(LogLevel.Error);
-                    });
+                    //    // example configuration certain properties in code, which would override config settings
+                    //    b.AddFile("ErrorLog")
+                    //        .WithOptions(o =>
+                    //        {
+                    //            o.Path = "logs/errors.json";
+                    //        })
+                    //        .WithJsonFormatter(o =>
+                    //        {
+                    //            o.IncludeScopes = true;
+                    //            o.EmptyLineBetweenMessages = false;
+                    //            o.TimestampFormat = "dd h:mm tt";
+                    //        })
+                    //        .WithMinLevel(LogLevel.Error);
+                    //});
 
 
                     l.Configure(f => 

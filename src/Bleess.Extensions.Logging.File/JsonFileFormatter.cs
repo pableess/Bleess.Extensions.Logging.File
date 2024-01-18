@@ -13,32 +13,19 @@ using System.Text.Json;
 
 namespace Bleess.Extensions.Logging.File;
 
-internal class JsonFileFormatter : FileFormatter, IDisposable
-{
-   
-    private IDisposable? _optionsReloadToken;
-    private IOptionsMonitor<JsonFileFormatterOptions> _options;
-    private ConcurrentDictionary<string, JsonFileFormatterOptions> _cachedOptions; // cache options per sub provider
-    
-
+internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
+{   
     public JsonFileFormatter(IOptionsMonitor<JsonFileFormatterOptions> options)
-        : base(FileFormatterNames.Json)
+        : base(FileFormatterNames.Json, options)
     {
-        _options = options;
-        _cachedOptions = new ConcurrentDictionary<string, JsonFileFormatterOptions>();
-        _optionsReloadToken = options.OnChange(ReloadLoggerOptions);
-    }
-
-    private void ReloadLoggerOptions(JsonFileFormatterOptions options, string? subProviderName)
-    {
-        var provider = subProviderName ?? DefaultOptionsKey;
-
-        _cachedOptions.AddOrUpdate(provider, options, (s, o) => options);
     }
 
     public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider scopeProvider, TextWriter textWriter, string? subProviderName, bool? fallbackIncludeScopes)
     {
-        JsonFileFormatterOptions formatterOptions = GetFormatterOption(subProviderName, fallbackIncludeScopes);
+        JsonFileFormatterOptions formatterOptions = this.GetOptions(subProviderName);
+        
+        // support obsolete setting on the provider
+        formatterOptions.IncludeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScopes;
 
         string message = logEntry.Formatter(logEntry.State, logEntry.Exception);
         if (logEntry.Exception == null && message == null)
@@ -110,17 +97,6 @@ internal class JsonFileFormatter : FileFormatter, IDisposable
         {
             ArrayPool<byte>.Shared.Return(buffer);
         }
-    }
-
-    private JsonFileFormatterOptions GetFormatterOption(string? subProviderName, bool? fallbackIncludeScopes)
-    {
-        var name = subProviderName ?? DefaultOptionsKey;
-
-        var formatterOptions = _cachedOptions.GetOrAdd(name, _options.Get(name));
-
-        formatterOptions.IncludeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScopes;
-
-        return formatterOptions;
     }
 
     private static string GetLogLevelString(LogLevel logLevel)
@@ -221,9 +197,4 @@ internal class JsonFileFormatter : FileFormatter, IDisposable
     }
 
     private static string? ToInvariantString(object? obj) => Convert.ToString(obj, CultureInfo.InvariantCulture);
-
-    public void Dispose()
-    {
-        _optionsReloadToken?.Dispose();
-    }
 }
