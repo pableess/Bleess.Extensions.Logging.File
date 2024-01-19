@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data.SqlTypes;
 using System.Globalization;
 using System.Text;
 
@@ -24,6 +25,11 @@ namespace Bleess.Extensions.Logging.File
         /// Gets or sets format string used to format timestamp in logging messages. Defaults to <c>[yyyy-MM-dd h:mm tt"]</c>.
         /// </summary>
         public string TimestampFormat { get; set; } = "yyyy-MM-dd h:mm tt";
+
+        /// <summary>
+        /// Whether or not the timestamp format string should pass invariant culture
+        /// </summary>
+        public bool InvariantTimestampFormat { get; set;  }
 
         /// <summary>
         /// Gets or sets indication whether or not UTC timezone should be used to for timestamps in logging messages. Defaults to <c>false</c>.

@@ -50,7 +50,14 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
                     if (timestampFormat != null)
                     {
                         DateTimeOffset dateTimeOffset = formatterOptions.UseUtcTimestamp ? DateTimeOffset.UtcNow : DateTimeOffset.Now;
-                        writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat));
+                        if (formatterOptions.InvariantTimestampFormat)
+                        {
+                            writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat, CultureInfo.InvariantCulture));
+                        }
+                        else 
+                        {
+                            writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat));
+                        }
                     }
                     writer.WriteNumber(nameof(logEntry.EventId), eventId);
                     writer.WriteString(nameof(logEntry.LogLevel), GetLogLevelString(logLevel));
@@ -154,7 +161,7 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
                 writer.WriteNumber(key, sbyteValue);
                 break;
             case char charValue:
-#if NET8_0_OR_GREATER
+#if NET5_0_OR_GREATER
                 writer.WriteString(key, System.Runtime.InteropServices.MemoryMarshal.CreateSpan(ref charValue, 1));
 #else
                 writer.WriteString(key, charValue.ToString());

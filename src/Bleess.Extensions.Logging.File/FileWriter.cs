@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Security;
 using System.Text;
 using System.Threading;
@@ -33,6 +34,8 @@ namespace Bleess.Extensions.Logging.File
         private TextWriter logFileWriter;
         private long fileSizeLimitBytes;
         private int maxRollingFiles;
+        private bool append;
+        private bool hasOpened;
 
         private volatile bool checkExtraFiles;
 
@@ -40,7 +43,7 @@ namespace Bleess.Extensions.Logging.File
 
         private readonly object limitsLock = new object();
 
-        internal FileWriter(string path, long fileSizeLimitBytes, int maxRollingFiles,  bool append, RollingInterval rollInterval)
+        internal FileWriter(string path, long fileSizeLimitBytes, int maxRollingFiles, bool append, RollingInterval rollInterval)
         {
             this.FilePath = path;
             this.fileSizeLimitBytes = fileSizeLimitBytes;
@@ -48,13 +51,7 @@ namespace Bleess.Extensions.Logging.File
             this.RollInterval = rollInterval;
             this.rollingFileInfo = new RollingFileInfo(path, rollInterval, false);
 
-            if (this.fileSizeLimitBytes > 0)
-            {
-                // update current log sequence number to last one
-                this.rollingFileInfo.AlignToDirectory();
-            }
-
-            OpenFile(append);
+            this.append = append;
          }
 
         public string FilePath { get; }
@@ -81,6 +78,26 @@ namespace Bleess.Extensions.Logging.File
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        void CheckOpen() 
+        {
+            if (!this.hasOpened)
+            {
+                this.OpenAndAlignFile();
+            }
+        }
+
+        void OpenAndAlignFile()
+        {
+            if (this.fileSizeLimitBytes > 0)
+            {
+                // update current log sequence number to last one
+                this.rollingFileInfo.AlignToDirectory();
+            }
+
+            OpenFile(this.append);
+        }
+
         void OpenFile(bool append)
         {
             var fileInfo = new FileInfo(rollingFileInfo.CurrentFile);
@@ -100,6 +117,8 @@ namespace Bleess.Extensions.Logging.File
                 logFileStream.SetLength(0); // clear the file
             }
             logFileWriter = new StreamWriter(logFileStream);
+           
+            this.hasOpened = true;
         }
 
         void CheckForNewLogFile()
@@ -164,6 +183,8 @@ namespace Bleess.Extensions.Logging.File
 
         internal void WriteMessage(string message, bool flush)
         {
+            CheckOpen();
+
             if (logFileWriter != null)
             {
                 CheckForNewLogFile();
@@ -178,7 +199,10 @@ namespace Bleess.Extensions.Logging.File
                 logFileWriter.WriteLine(message);
 
                 if (flush)
+                {
                     logFileWriter.Flush();
+                    logFileWriter.Flush();
+                }
             }
         }
 

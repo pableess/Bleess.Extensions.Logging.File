@@ -17,28 +17,28 @@ namespace Sample
                 .ConfigureServices(s => s.AddHostedService<LoggingService>())
                 .ConfigureLogging(l =>
                 {
-                    l.AddConsole(c => { c.IncludeScopes = true; });
+
                     l.AddFile(); // default log file
 
-                    //l.AddFiles(b =>
-                    //{
-                    //    // example adding log provider, will use settings in configuration
-                    //    b.AddFile("TraceLog");
+                    l.AddFiles(b =>
+                    {
+                        // example adding log provider, will use settings in configuration
+                        b.AddFile("TraceLog");
 
-                    //    // example configuration certain properties in code, which would override config settings
-                    //    b.AddFile("ErrorLog")
-                    //        .WithOptions(o =>
-                    //        {
-                    //            o.Path = "logs/errors.json";
-                    //        })
-                    //        .WithJsonFormatter(o =>
-                    //        {
-                    //            o.IncludeScopes = true;
-                    //            o.EmptyLineBetweenMessages = false;
-                    //            o.TimestampFormat = "dd h:mm tt";
-                    //        })
-                    //        .WithMinLevel(LogLevel.Error);
-                    //});
+                        // example configuration certain properties in code, which would override config settings
+                        b.AddFile("ErrorLog")
+                            .WithOptions(o =>
+                            {
+                                o.Path = "logs/errors.json";
+                            })
+                            .WithJsonFormatter(o =>
+                            {
+                                o.IncludeScopes = true;
+                                o.EmptyLineBetweenMessages = false;
+                                o.TimestampFormat = "dd h:mm tt";
+                            })
+                            .WithMinLevel(LogLevel.Error);
+                    });
 
 
                     l.Configure(f => 
@@ -71,12 +71,15 @@ namespace Sample
             int i = 0;
             var r = new Random();
 
+
+            await Task.Delay(5000);
+
             while (!stoppingToken.IsCancellationRequested) 
             {
                 i++;
 
                 using var a = new Activity("Sample");
-                a.Start();
+                    a.Start();
 
                 a.SetTag("bar", i.ToString());
 
@@ -91,7 +94,7 @@ namespace Sample
                         this.logger.LogError("This is an error");
                     }
 
-                    await Task.Delay(1000);
+                    //await Task.Delay(1000);
                 }
 
                 a.Stop();

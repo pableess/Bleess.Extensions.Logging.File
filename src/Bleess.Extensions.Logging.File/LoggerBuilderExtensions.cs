@@ -50,68 +50,76 @@
         }
 
         /// <summary>
-        /// Add the default File log formatter named 'simple' to the factory with default properties.
-        /// </summary>
-        /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
-        public static ILoggingBuilder AddSimpleFile(this ILoggingBuilder builder) =>
-            builder.AddFormatterWithName(FileFormatterNames.Simple);
-
-        /// <summary>
         /// Add and configure a File log formatter named 'simple' to the factory.
         /// </summary>
         /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
-        /// <param name="configure">A delegate to configure the <see cref="FileLogger"/> options for the built-in default log formatter.</param>
-        public static ILoggingBuilder AddSimpleFile(this ILoggingBuilder builder, Action<SimpleFileFormatterOptions> configure)
+        /// <param name="configureLoggerOptions">A delegate to configure the <see cref="FileLoggerOptions"/> options</param>
+        /// <param name="configureFormatterOptions">A delegate to configure the <see cref="SimpleFileFormatterOptions"/> options for the built-in default log formatter.</param>
+        public static ILoggingBuilder AddSimpleFile(this ILoggingBuilder builder, Action<FileLoggerOptions> configureLoggerOptions = null, Action<SimpleFileFormatterOptions> configureFormatterOptions = null)
         {
-            return builder.AddFileWithFormatter<SimpleFileFormatterOptions>(FileFormatterNames.Simple, configure);
-        }
+            builder.AddFileUsingFormatter<SimpleFileFormatterOptions>(FileFormatterNames.Simple, configureFormatterOptions);
 
-        /// <summary>
-        /// Add a File log formatter named 'json' to the factory with default properties.
-        /// </summary>
-        /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
-        public static ILoggingBuilder AddJsonFile(this ILoggingBuilder builder) =>
-            builder.AddFormatterWithName(FileFormatterNames.Json);
+            if (configureLoggerOptions != null)
+            {
+                builder.Services.Configure<FileLoggerOptions>(configureLoggerOptions);
+            }
+
+            return builder;
+        }
 
         /// <summary>
         /// Add and configure a File log formatter named 'json' to the factory.
         /// </summary>
         /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
-        /// <param name="configure">A delegate to configure the <see cref="FileLogger"/> options for the built-in json log formatter.</param>
-        public static ILoggingBuilder AddJsonFile(this ILoggingBuilder builder, Action<JsonFileFormatterOptions> configure)
+        /// <param name="configureLoggerOptions">A delegate to configure the <see cref="FileLoggerOptions"/> for the built-in json log formatter.</param>
+        /// <param name="configureFormatterOptions">A delegate to configure the <see cref="JsonFileFormatterOptions"/> for the built-in json log formatter.</param>
+        public static ILoggingBuilder AddJsonFile(this ILoggingBuilder builder, Action<FileLoggerOptions> configureLoggerOptions = null, Action<JsonFileFormatterOptions> configureFormatterOptions = null)
         {
-            return builder.AddFileWithFormatter<JsonFileFormatterOptions>(FileFormatterNames.Json, configure);
-        }
+            builder.AddFileUsingFormatter<JsonFileFormatterOptions>(FileFormatterNames.Json, configureFormatterOptions);
 
-        internal static ILoggingBuilder AddFileWithFormatter<TOptions>(this ILoggingBuilder builder, string name, Action<TOptions> configure)
-            where TOptions : FileFormatterOptions
-        {
-            if (configure == null)
+            if (configureLoggerOptions != null)
             {
-                throw new ArgumentNullException(nameof(configure));
+                builder.Services.Configure<FileLoggerOptions>(configureLoggerOptions);
             }
-            builder.AddFormatterWithName(name);
-            builder.Services.Configure(configure);
-
             return builder;
         }
 
-        private static ILoggingBuilder AddFormatterWithName(this ILoggingBuilder builder, string name) =>
-            builder.AddFile((FileLoggerOptions options) => options.FormatterName = name);
+
+        /// <summary>
+        /// Adds a file logger that is configured to use the specified formatter
+        /// </summary>
+        /// <typeparam name="TFormatterOptions"></typeparam>
+        /// <param name="builder"></param>
+        /// <param name="formatterName">The type of formatter </param>
+        /// <param name="configure"></param>
+        /// <returns></returns>
+        /// <exception cref="ArgumentNullException"></exception>
+        internal static ILoggingBuilder AddFileUsingFormatter<TFormatterOptions>(this ILoggingBuilder builder, string formatterName, Action<TFormatterOptions> configure = null)
+            where TFormatterOptions : FileFormatterOptions
+        {
+            // Add file and configure options to use the named options
+            builder.AddFile((FileLoggerOptions options) => options.FormatterName = formatterName);
+
+            if (configure != null)
+            {
+                builder.Services.Configure(configure);
+            }
+            return builder;
+        }
 
         /// <summary>
         /// Adds a custom File logger formatter 'TFormatter' to be configured with options 'TOptions'.
         /// </summary>
         /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
-        public static ILoggingBuilder AddFileFormatter<TFormatter, TOptions>(this ILoggingBuilder builder)
-            where TOptions : FileFormatterOptions
+        public static ILoggingBuilder AddFileFormatter<TFormatter, TFormatterOptions>(this ILoggingBuilder builder)
             where TFormatter : FileFormatter
+            where TFormatterOptions : class
         {
             builder.AddConfiguration();
 
             builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<FileFormatter, TFormatter>());
-            builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<TOptions>, FileLoggerFormatterConfigureOptions<TFormatter, TOptions>>());
-            builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOptionsChangeTokenSource<TOptions>, FileLoggerFormatterOptionsChangeTokenSource<TFormatter, TOptions>>());
+            builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<TFormatterOptions>, FileLoggerFormatterConfigureOptions<TFormatter, TFormatterOptions>>());
+            builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOptionsChangeTokenSource<TFormatterOptions>, FileLoggerFormatterOptionsChangeTokenSource<TFormatter, TFormatterOptions>>());
 
             return builder;
         }
@@ -121,8 +129,8 @@
         /// </summary>
         /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
         /// <param name="configure">A delegate to configure options 'TOptions' for custom formatter 'TFormatter'.</param>
-        public static ILoggingBuilder AddFileFormatter<TFormatter, TOptions>(this ILoggingBuilder builder, Action<TOptions> configure)
-            where TOptions : FileFormatterOptions
+        public static ILoggingBuilder AddFileFormatter<TFormatter, TFormatterOptions>(this ILoggingBuilder builder, Action<TFormatterOptions> configure)
+            where TFormatterOptions : class
             where TFormatter : FileFormatter
         {
             if (configure == null)
@@ -130,14 +138,14 @@
                 throw new ArgumentNullException(nameof(configure));
             }
 
-            builder.AddFileFormatter<TFormatter, TOptions>();
+            builder.AddFileFormatter<TFormatter, TFormatterOptions>();
             builder.Services.Configure(configure);
             return builder;
         }
     }
 
     internal class FileLoggerFormatterConfigureOptions<TFormatter, TOptions> : ConfigureFromConfigurationOptions<TOptions>
-        where TOptions : FileFormatterOptions
+        where TOptions : class
         where TFormatter : FileFormatter
     {
         public FileLoggerFormatterConfigureOptions(ILoggerProviderConfiguration<FileLoggerProvider> providerConfiguration) :
@@ -147,7 +155,7 @@
     }
 
     internal class FileLoggerFormatterOptionsChangeTokenSource<TFormatter, TOptions> : ConfigurationChangeTokenSource<TOptions>
-        where TOptions : FileFormatterOptions
+        where TOptions : class
         where TFormatter : FileFormatter
     {
         public FileLoggerFormatterOptionsChangeTokenSource(ILoggerProviderConfiguration<FileLoggerProvider> providerConfiguration)

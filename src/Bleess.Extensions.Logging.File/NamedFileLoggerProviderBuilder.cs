@@ -54,7 +54,7 @@ public sealed class NamedFileLoggerProviderBuilder
     /// </summary>
     /// <param name="configure">Configuration delegate</param>
     /// <returns></returns>
-    public NamedFileLoggerProviderBuilder WithSimpleFormatter(Action<SimpleFileFormatterOptions> configure)
+    public NamedFileLoggerProviderBuilder WithSimpleFormatter(Action<SimpleFileFormatterOptions>? configure = null)
     {
         _builder.Services.Configure<FileLoggerOptions>(_providerAlias, c => c.FormatterName = FileFormatterNames.Simple);
         if (configure != null)
@@ -69,25 +69,26 @@ public sealed class NamedFileLoggerProviderBuilder
     /// </summary>
     /// <typeparam name="TFormatter"></typeparam>
     /// <typeparam name="TFormatterOptions"></typeparam>
-    /// <param name="formatterName">The name of the formatter</param>
+    /// <param name="formatterName">the type of formatter</param>
     /// <param name="configure"></param>
     /// <returns></returns>
-    public NamedFileLoggerProviderBuilder WithFormatter<TFormatter, TFormatterOptions>(string formatterName, Action<TFormatterOptions> configure)
+    public NamedFileLoggerProviderBuilder WithFormatter<TFormatter, TFormatterOptions>(string formatterName, Action<TFormatterOptions>? configure = null)
         where TFormatter : FileFormatter
-        where TFormatterOptions : FileFormatterOptions
+        where TFormatterOptions : class
     {
-        _builder.AddFileFormatter<TFormatter, TFormatterOptions>(_providerAlias, formatterOptions => 
-        {
-            configure(formatterOptions);
-        });
-
-        // configure logger to use a custom formatter
         _builder.Services.Configure<FileLoggerOptions>(_providerAlias, c => c.FormatterName = formatterName);
+
+        // register the formatter type 
+        _builder.AddFileFormatter<TFormatter, TFormatterOptions>();
+
         if (configure != null)
         {
-            _builder.Services.Configure(_providerAlias, configure);
+            _builder.Services.Configure(formatterName, configure);
         }
 
+        // configure logger to use a custom formatter
+        _builder.Services.Configure<FileLoggerOptions>(_providerAlias, c => c.FormatterName = _providerAlias);
+        
         return this;
     }
 

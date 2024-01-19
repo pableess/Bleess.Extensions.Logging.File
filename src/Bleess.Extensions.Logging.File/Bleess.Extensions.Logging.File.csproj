@@ -9,7 +9,7 @@
     <Deterministic>true</Deterministic>
     
 		<VersionPrefix>2.0.0</VersionPrefix>
-    <VersionSuffix>rc2</VersionSuffix>
+    <VersionSuffix></VersionSuffix>
 
 		<Authors>Paul Bleess</Authors>
 		<Description>Simple file logger for dotnet Microsoft.Extensions.Logging</Description>
