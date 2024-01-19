@@ -150,7 +150,7 @@ Example configuration
 
  ## Benchmarks
 
- For performance benchmarked aginst a couple of other popular file loggers for .NET core.  Specically NReco and Karambolo loggers. See the results below.
+ The library has be benchmarked against a couple of other popular file loggers for .NET core.  Specically NReco and Karambolo loggers. See the results below.
 
  #### Simple Text Message
  ```
