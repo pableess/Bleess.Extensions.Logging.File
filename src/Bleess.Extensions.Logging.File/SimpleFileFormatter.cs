@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading;
@@ -46,7 +47,15 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
         if (timestampFormat != null)
         {
             DateTimeOffset dateTimeOffset = GetCurrentDateTime(formatterOptions);
-            timestamp = dateTimeOffset.ToString(timestampFormat) + " ";
+
+            if (formatterOptions.InvariantTimestampFormat)
+            {
+                timestamp = dateTimeOffset.ToString(timestampFormat, CultureInfo.InvariantCulture) + " ";
+            }
+            else
+            {
+                timestamp = dateTimeOffset.ToString(timestampFormat) + " ";
+            }
         }
         if (timestamp != null)
         {

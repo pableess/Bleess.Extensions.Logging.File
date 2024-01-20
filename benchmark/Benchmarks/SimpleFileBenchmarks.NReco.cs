@@ -26,7 +26,7 @@ namespace Benchmarks
                 logBuilder.AddFile("logs/NReco.txt", o => 
                 {
                     
-                    o.FileSizeLimitBytes = 1024 * 1024 * 1024; // 1 MB
+                    o.FileSizeLimitBytes = 1024 * 1024 * 1024; // 1 GB
                     o.MaxRollingFiles = 31;
                     o.UseUtcTimestamp = true;
                 });
@@ -39,9 +39,20 @@ namespace Benchmarks
 
 
         [Benchmark]
-        public void NRecoWrite() 
+        [BenchmarkCategory("text")]
+        public void NReco_single_write() 
         {
             _nRecoLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
+        }
+
+        [Benchmark]
+        [BenchmarkCategory("text", "10000")]
+        public void NReco_10000_write()
+        {
+            for (int i = 0; i < 10000; i++)
+            {
+                _nRecoLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
+            }
         }
     }
 }

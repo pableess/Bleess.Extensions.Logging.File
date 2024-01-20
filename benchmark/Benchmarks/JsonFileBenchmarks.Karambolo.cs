@@ -24,14 +24,15 @@ namespace Benchmarks
             ServiceCollection sc = new ServiceCollection();
             sc.AddLogging(logBuilder => 
             {
-                logBuilder.AddFile(o => 
+                logBuilder.AddJsonFile(o => 
                 {
-                    o.MaxFileSize = 1024 * 1024 * 1024; // 1 MB
+                    o.MaxFileSize = 1024 * 1024 * 1024; // 1 GB
                     o.IncludeScopes = false;
+                    o.MaxQueueSize = 1024;
 
                     o.Files = new LogFileOptions[] 
                     {
-                        new LogFileOptions{ Path = "logs/karambolo.txt" }
+                        new LogFileOptions{ Path = "logs/karambolo.json" }
                     };
                 });
             });
@@ -43,7 +44,8 @@ namespace Benchmarks
 
 
         [Benchmark]
-        public void KaramboloWrite() 
+        [BenchmarkCategory("json")]
+        public void Karambolo_single_write_json() 
         {
             _karamboloLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
         }

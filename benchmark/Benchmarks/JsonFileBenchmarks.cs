@@ -17,7 +17,7 @@ using Bleess::Microsoft.Extensions.Logging;
 namespace Benchmarks
 {
     [MemoryDiagnoser()]
-    [SimpleJob(launchCount: 2, warmupCount: 10, iterationCount: 2)]
+    [SimpleJob(2, 10, 10)]
     public partial class JsonFileBenchmarks
     {
 
@@ -36,15 +36,14 @@ namespace Benchmarks
             ServiceCollection sc = new ServiceCollection();
             sc.AddLogging(lobBuilder =>
             {
-                lobBuilder.AddSimpleFile(o =>
+                lobBuilder.AddJsonFile(o =>
                 {
                     o.Path = "logs/Bleess.txt";
-                    o.MaxFileSizeInMB = 1024 * 1024; // 1 GB
+                    o.MaxFileSizeInMB = 1024; // 1 GB
                     o.MaxNumberFiles = 31;
                 },
                 o =>
                 {
-                    o.SingleLine = true;
                     o.EmptyLineBetweenMessages = true;
                     o.IncludeScopes = false;
                     o.UseUtcTimestamp = true;
@@ -55,14 +54,12 @@ namespace Benchmarks
 
             _bleessLogger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("default");
 
-
-
-
         }
 
 
         [Benchmark]
-        public void BleessWrite()
+        [BenchmarkCategory("json")]
+        public void Bleess_single_write_json()
         {
             _bleessLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
         }

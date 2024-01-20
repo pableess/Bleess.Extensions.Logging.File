@@ -1,24 +1,21 @@
 ﻿# Bleess.Extensions.Logging.File
 High performance rolling file logger for Microsoft.Extensions.Logging with no other 3rd party dependencies. Modeled after the standard console logger.
 
-- Rolling files, max file size, max number or files, rolling by time period
+- Rolling files, max file size, max number of files, rolling by time period
 - Text or Json output as well as custom formatters
-- Standard idomatic configuration (similar to other MS logging providers) using IConfiguration or configuration callbacks
+- Standard idiomatic configuration (similar to other MS logging providers) using IConfiguration or configuration callbacks
 - Abitity to update settings such as log level, filter rules, or log file path while application is running
 - Logging scopes and activity tracking support
-- High performance using dedicated write thread and 
+- High performance using dedicated write thread
 - Ability to specify multiple log files with independent settings
-
-
-This project is very similar to nReco/logging with a few additions: multiple files, logging scopes, json output, streamlined configuration, and abiltity to modify settings while running.
 
 ## Usage
 
 Add the nuget package Bleess.Extensions.Logging.File
 
- The log provider is configured just like any other Microsoft.Extensions.Logging providers.  There are extensions methods on the ILogBuilder to add the provider.
- 
- When using Host.CreateDefaultBuilder you only need to call `AddFile()`, and the logger will be configured using configuration providers.  There are also other overloads to configure the logger using options callbacks etc.
+The log provider is configured just like any other Microsoft.Extensions.Logging providers.  There are extensions methods on the ILogBuilder to add the provider.
+
+When using Host.CreateDefaultBuilder you only need to call `AddFile()`, and the logger will be configured using configuration providers.  There are also other overloads to configure the logger using options callbacks etc.
  
  ```csharp
  logBuilder.AddFile();
@@ -139,7 +136,6 @@ Example configuration
     },
 ```
 
-
 ## Rolling Behavior
  Log files can have a max file size at which time a new file will be create with a incremented id appended.  You may also specify a maximum number of files to retain.  Once the maximum number of files has been reached, the oldest will be overwritten.
  Using RollInterval setting, you can also specify that a date will be appended to the file name and the files will roll according to the date in 'yyyyMMddHH' format.
@@ -159,16 +155,19 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3007/23H2/2023Update/SunValley3
 AMD Ryzen 5 5600H with Radeon Graphics, 1 CPU, 12 logical and 6 physical cores
 .NET SDK 8.0.100
   [Host]     : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
-  Job-WGADCC : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
+  Job-HSNTJM : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
 
-IterationCount=2  LaunchCount=2  WarmupCount=10  
+IterationCount=10  LaunchCount=2  WarmupCount=10  
 
 ```
-| Method         | Mean       | Error    | StdDev    | Gen0   | Gen1   | Allocated |
-|--------------- |-----------:|---------:|----------:|-------:|-------:|----------:|
-| BleessWrite    |   662.4 ns | 190.9 ns |  29.54 ns | 0.1068 |      - |     904 B |
-| KaramboloWrite | 1,064.2 ns | 975.5 ns | 150.96 ns | 0.0839 | 0.0381 |     709 B |
-| NRecoWrite     | 1,585.5 ns | 139.9 ns |  21.65 ns | 0.1621 | 0.0076 |    1371 B |
+| Method                 | Mean            | Error         | StdDev        | Gen0      | Gen1     | Allocated  |
+|----------------------- |----------------:|--------------:|--------------:|----------:|---------:|-----------:|
+| Bleess_single_write    |        659.6 ns |      20.31 ns |      22.57 ns |    0.1068 |   0.0038 |      904 B |
+| Karambolo_single_write |        679.7 ns |      82.32 ns |      94.80 ns |    0.0839 |        - |      706 B |
+| NReco_single_write     |      1,547.5 ns |      13.10 ns |      14.56 ns |    0.1640 |   0.0057 |     1373 B |
+| Bleess_10000_writes    |  6,469,397.9 ns | 163,216.34 ns | 181,414.53 ns | 1078.1250 |        - |  9040006 B |
+| Karambolo_10000_write  |  6,522,278.8 ns | 318,328.54 ns | 366,587.62 ns |  843.7500 |        - |  7083785 B |
+| NReco_10000_write      | 15,962,119.6 ns | 380,106.19 ns | 406,709.37 ns | 1625.0000 | 125.0000 | 13713687 B |
 
 
 #### Json file
@@ -178,15 +177,17 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3007/23H2/2023Update/SunValley3
 AMD Ryzen 5 5600H with Radeon Graphics, 1 CPU, 12 logical and 6 physical cores
 .NET SDK 8.0.100
   [Host]     : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
-  Job-WGADCC : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
+  Job-HSNTJM : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
 
-IterationCount=2  LaunchCount=2  WarmupCount=10  
+IterationCount=10  LaunchCount=2  WarmupCount=10  
 
 ```
-| Method         | Mean     | Error    | StdDev    | Gen0   | Gen1   | Allocated |
-|--------------- |---------:|---------:|----------:|-------:|-------:|----------:|
-| BleessWrite    | 621.8 ns | 162.6 ns |  25.16 ns | 0.1068 |      - |     904 B |
-| KaramboloWrite | 985.7 ns | 721.7 ns | 111.68 ns | 0.0839 | 0.0381 |     710 B |
+| Method                      | Mean     | Error     | StdDev    | Gen0   | Gen1   | Gen2   | Allocated |
+|---------------------------- |---------:|----------:|----------:|-------:|-------:|-------:|----------:|
+| Bleess_single_write_json    | 1.990 μs | 0.0469 μs | 0.0521 μs | 0.9766 |      - |      - |   7.99 KB |
+| Karambolo_single_write_json | 2.118 μs | 0.1781 μs | 0.2051 μs | 0.3204 | 0.0458 | 0.0153 |   2.65 KB |
+
+
 
 #### Multi-File
 ```
@@ -195,19 +196,19 @@ BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3007/23H2/2023Update/SunValley3
 AMD Ryzen 5 5600H with Radeon Graphics, 1 CPU, 12 logical and 6 physical cores
 .NET SDK 8.0.100
   [Host]     : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
-  Job-WGADCC : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
+  Job-HSNTJM : .NET 8.0.0 (8.0.23.53103), X64 RyuJIT AVX2
 
-IterationCount=2  LaunchCount=2  WarmupCount=10  
+IterationCount=10  LaunchCount=2  WarmupCount=10  
 
 ```
-| Method         | Mean     | Error     | StdDev    | Gen0   | Gen1   | Allocated |
-|--------------- |---------:|----------:|----------:|-------:|-------:|----------:|
-| BleessWrite    | 1.441 μs | 0.2313 μs | 0.0358 μs | 0.2213 |      - |    1856 B |
-| KaramboloWrite | 1.335 μs | 0.2949 μs | 0.0456 μs | 0.0877 | 0.0458 |     734 B |
+| Method                           | Mean     | Error     | StdDev    | Gen0   | Gen1   | Allocated |
+|--------------------------------- |---------:|----------:|----------:|-------:|-------:|----------:|
+| Bleess_multifile_single_write    | 1.374 μs | 0.0396 μs | 0.0441 μs | 0.1984 |      - |   1.67 KB |
+| Karambolo_multifile_single_write | 1.554 μs | 0.1430 μs | 0.1647 μs | 0.1602 | 0.0229 |   1.33 KB |
 
 
 ## Credits
- - Most of the code was a adapted from dotnet source code (specifically Microsoft.Extensions.Logging.Console) https://github.com/dotnet/runtime/tree/master/src/libraries/Microsoft.Extensions.Logging.Console
- - The FileWriter was adapted from https://github.com/nreco/logging
+ - Some of the code was a adapted from dotnet source code (specifically Microsoft.Extensions.Logging.Console) https://github.com/dotnet/runtime/tree/master/src/libraries/Microsoft.Extensions.Logging.Console
+ - The FileWriter was originally adapted from https://github.com/nreco/logging, but has since been significantly modified.
  
  

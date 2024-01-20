@@ -17,7 +17,7 @@ using Bleess::Microsoft.Extensions.Logging;
 namespace Benchmarks
 {
     [MemoryDiagnoser()]
-    [SimpleJob(launchCount: 2, warmupCount: 10, iterationCount: 2)]
+    [SimpleJob(2, 10, 10)]
     public partial class MultiFileBenchmarks
     {
 
@@ -71,15 +71,12 @@ namespace Benchmarks
             var sp = sc.BuildServiceProvider();
 
             _bleessLogger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("default");
-
-
-
-
         }
 
 
         [Benchmark]
-        public void BleessWrite()
+        [BenchmarkCategory("multifile")]
+        public void Bleess_multifile_single_write()
         {
             _bleessLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
         }

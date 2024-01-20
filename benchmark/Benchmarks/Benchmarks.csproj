@@ -10,7 +10,7 @@
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" Version="0.13.12" />
     <PackageReference Include="Karambolo.Extensions.Logging.File" Version="3.5.0" Aliases="Karambolo" />
-    <PackageReference Include="Karambolo.Extensions.Logging.File.Json" Version="3.5.0" />
+    <PackageReference Include="Karambolo.Extensions.Logging.File.Json" Version="3.5.0" Aliases="Karambolo" />
     <PackageReference Include="NReco.Logging.File" Version="1.2.0" Aliases="NReco" />
   </ItemGroup>
 

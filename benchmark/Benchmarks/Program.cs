@@ -6,14 +6,12 @@ namespace Benchmarks
     {
         static void Main(string[] args)
         {
-            // simple 
-            BenchmarkRunner.Run<SimpleFileBenchmarks>();
-            
-            // json
-            BenchmarkRunner.Run<JsonFileBenchmarks>();
-            
-            // composite
-            BenchmarkRunner.Run<MultiFileBenchmarks>();
+            BenchmarkRunner.Run(
+            [
+                BenchmarkConverter.TypeToBenchmarks(typeof(SimpleFileBenchmarks)),
+                BenchmarkConverter.TypeToBenchmarks(typeof(JsonFileBenchmarks)),
+                BenchmarkConverter.TypeToBenchmarks(typeof(MultiFileBenchmarks))
+            ]);
         }
     }
 }

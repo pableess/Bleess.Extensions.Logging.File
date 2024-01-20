@@ -17,7 +17,8 @@ using Bleess::Microsoft.Extensions.Logging;
 namespace Benchmarks
 {
     [MemoryDiagnoser()]
-    [SimpleJob(launchCount: 2, warmupCount: 10, iterationCount: 2)]
+    [SimpleJob(2, 10, 10)]
+
     public partial class SimpleFileBenchmarks
     {
 
@@ -40,7 +41,7 @@ namespace Benchmarks
                 lobBuilder.AddSimpleFile(o =>
                 {
                     o.Path = "logs/Bleess.txt";
-                    o.MaxFileSizeInMB = 1024 * 1024; // 1 GB
+                    o.MaxFileSizeInMB = 1024; // 1 GB
                     o.MaxNumberFiles = 31;
                 },
                 o =>
@@ -63,9 +64,20 @@ namespace Benchmarks
 
 
         [Benchmark]
-        public void BleessWrite()
+        [BenchmarkCategory("text")]
+        public void Bleess_single_write()
         {
             _bleessLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
+        }
+
+        [Benchmark]
+        [BenchmarkCategory("text", "10000")]
+        public void Bleess_10000_writes()
+        {
+            for (int i = 0; i < 10000; i++)
+            {
+                _bleessLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
+            }
         }
     }
 }

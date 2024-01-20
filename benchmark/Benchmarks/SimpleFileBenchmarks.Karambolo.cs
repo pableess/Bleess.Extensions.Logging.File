@@ -27,6 +27,9 @@ namespace Benchmarks
                 logBuilder.AddFile(o => 
                 {
                     o.MaxFileSize = 1024 * 1024 * 1024; // 1 MB
+
+                    o.MaxQueueSize = 1024;
+
                     o.IncludeScopes = false;
 
                     o.Files = new LogFileOptions[] 
@@ -43,9 +46,20 @@ namespace Benchmarks
 
 
         [Benchmark]
-        public void KaramboloWrite() 
+        [BenchmarkCategory("text")]
+        public void Karambolo_single_write() 
         {
             _karamboloLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
+        }
+
+        [Benchmark]
+        [BenchmarkCategory("text", "10000")]
+        public void Karambolo_10000_write()
+        {
+            for (int i = 0; i < 10000; i++)
+            {
+                _karamboloLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
+            }
         }
     }
 }
