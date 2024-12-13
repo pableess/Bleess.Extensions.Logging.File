@@ -201,6 +201,7 @@ IterationCount=10  LaunchCount=2  WarmupCount=10
 
 ```
 
+
 | Method                           | Mean     | Error     | StdDev    | Gen0   | Gen1   | Allocated |
 |--------------------------------- |----------|-----------|-----------|--------|--------|-----------|
 | Bleess_multifile_single_write    | 1.374 μs | 0.0396 μs | 0.0441 μs | 0.1984 |      - |   1.67 KB |
