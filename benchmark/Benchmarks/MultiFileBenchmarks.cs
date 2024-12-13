@@ -20,8 +20,6 @@ namespace Benchmarks
     [SimpleJob(2, 10, 10)]
     public partial class MultiFileBenchmarks
     {
-
-
         public MultiFileBenchmarks()
         {
             this.SetupBleessLogging();
