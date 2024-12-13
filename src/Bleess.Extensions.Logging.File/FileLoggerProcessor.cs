@@ -62,6 +62,11 @@ namespace Bleess.Extensions.Logging.File
                     _lastFlush = Stopwatch.StartNew();
                     _maxFlushInterval = options.MaxFlushInterval.Value;
                 }
+                else 
+                {
+                    _lastFlush?.Stop();
+                    _lastFlush = null;
+                }
 
                 // if the file path didn't change, just update the limits
                 if (this._writer != null && this._writer?.FilePath == options.Path && this._writer.RollInterval == options.RollInterval)
@@ -92,13 +97,14 @@ namespace Bleess.Extensions.Logging.File
             {
                 foreach (LogMessageEntry message in _messageQueue.GetConsumingEnumerable())
                 {
-                    bool flush = _messageQueue.Count == 0 || (_lastFlush != null && _lastFlush.ElapsedMilliseconds >= _maxFlushInterval);
+                    bool flush = _messageQueue.Count == 0 || (_lastFlush != null && _lastFlush?.ElapsedMilliseconds >= _maxFlushInterval);
 
                     _writer?.WriteMessage(message.Message, flush);
 
                     if (flush && _lastFlush != null) 
                     {
-                        _lastFlush.Restart();
+                        // race condition so check for null again
+                        _lastFlush?.Restart();
                     }
                 }
             }
