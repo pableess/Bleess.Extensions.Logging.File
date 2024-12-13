@@ -201,7 +201,7 @@ namespace Bleess.Extensions.Logging.File
                 if (flush)
                 {
                     logFileWriter.Flush();
-                    logFileWriter.Flush();
+                    logFileStream.Flush();
                 }
             }
         }
