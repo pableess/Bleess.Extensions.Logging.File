@@ -148,9 +148,8 @@ Example configuration
 
  The library has be benchmarked against a couple of other popular file loggers for .NET core.  Specically NReco and Karambolo loggers. See the results below.
 
- #### Simple Text Message
+ ### Simple Text Message
  ```
-
 BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3007/23H2/2023Update/SunValley3)
 AMD Ryzen 5 5600H with Radeon Graphics, 1 CPU, 12 logical and 6 physical cores
 .NET SDK 8.0.100
@@ -160,6 +159,7 @@ AMD Ryzen 5 5600H with Radeon Graphics, 1 CPU, 12 logical and 6 physical cores
 IterationCount=10  LaunchCount=2  WarmupCount=10  
 
 ```
+
 | Method                 | Mean            | Error         | StdDev        | Gen0      | Gen1     | Allocated  |
 |----------------------- |----------------:|--------------:|--------------:|----------:|---------:|-----------:|
 | Bleess_single_write    |        659.6 ns |      20.31 ns |      22.57 ns |    0.1068 |   0.0038 |      904 B |
@@ -170,9 +170,8 @@ IterationCount=10  LaunchCount=2  WarmupCount=10
 | NReco_10000_write      | 15,962,119.6 ns | 380,106.19 ns | 406,709.37 ns | 1625.0000 | 125.0000 | 13713687 B |
 
 
-#### Json file
+### Json file
 ```
-
 BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3007/23H2/2023Update/SunValley3)
 AMD Ryzen 5 5600H with Radeon Graphics, 1 CPU, 12 logical and 6 physical cores
 .NET SDK 8.0.100
@@ -188,8 +187,7 @@ IterationCount=10  LaunchCount=2  WarmupCount=10
 | Karambolo_single_write_json | 2.118 μs | 0.1781 μs | 0.2051 μs | 0.3204 | 0.0458 | 0.0153 |   2.65 KB |
 
 
-
-#### Multi-File
+### Multi-File
 ```
 
 BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3007/23H2/2023Update/SunValley3)
