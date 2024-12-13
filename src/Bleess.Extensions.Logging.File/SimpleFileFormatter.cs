@@ -79,7 +79,7 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
         //       Request received
 
         // category and event id
-        WriteLevelAndCategory<TState>(textWriter, logEntry);
+        WriteCategoryAndEventId<TState>(textWriter, logEntry);
 
         WriteMessage(textWriter, message, singleLine);
 
@@ -100,8 +100,9 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
         }
     }
 
-    private void WriteLevelAndCategory<TState>(TextWriter textWriter, LogEntry<TState> logEntry) 
+    private void WriteCategoryAndEventId<TState>(TextWriter textWriter, LogEntry<TState> logEntry) 
     {
+        textWriter.Write(LoglevelPadding);
         textWriter.Write(logEntry.Category);
         textWriter.Write(" [");
         textWriter.Write(logEntry.EventId.Id);
