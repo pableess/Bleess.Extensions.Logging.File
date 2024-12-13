@@ -62,6 +62,18 @@ namespace Bleess.Extensions.Logging.File
         /// </summary>
         public bool Append { get; set; } = true;
 
+        /// <summary>
+        /// If true, forces the flush operations to ensure that all data is written to the underlying disk (ie fsync on linux)
+        /// </summary>
+        public bool FlushToDisk { get; set; } = false;
+
+        /// <summary>
+        /// In high throughput scenarios, log messages are queued up and written from a background thread.  
+        /// By default, flushing of the log file to disk only happens when the queue is emptied. This setting, ensures that 
+        /// a flush to disk will happen if a previous flush has not occured within this interval.  Setting is in MS
+        /// </summary>
+        public int? MaxFlushInterval { get; set; }
+
         internal long MaxFileSizeInBytes => (long)(MaxFileSizeInMB * 1024 * 1024);
     }
 }

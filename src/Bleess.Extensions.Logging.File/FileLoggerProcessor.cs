@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Text;
 using System.Threading;
 
@@ -13,6 +14,8 @@ namespace Bleess.Extensions.Logging.File
         private readonly Thread _outputThread;
 
         private FileWriter _writer;
+        Stopwatch _lastFlush;
+        long _maxFlushInterval;
 
         public FileLoggerProcessor(FileLoggerOptions initialOptions, int maxMessageQueuedMessage = 1024)
         {
@@ -29,7 +32,7 @@ namespace Bleess.Extensions.Logging.File
             _outputThread.Start();
         }
 
-        public virtual void EnqueueMessage(LogMessageEntry message)
+        public virtual void EnqueueMessage(ref LogMessageEntry message)
         {
             if (!_messageQueue.IsAddingCompleted)
             {
@@ -54,16 +57,21 @@ namespace Bleess.Extensions.Logging.File
         {
             try
             {
+                if (options.MaxFlushInterval != null && options.MaxFlushInterval >= 0)
+                {
+                    _lastFlush = Stopwatch.StartNew();
+                    _maxFlushInterval = options.MaxFlushInterval.Value;
+                }
 
                 // if the file path didn't change, just update the limits
                 if (this._writer != null && this._writer?.FilePath == options.Path && this._writer.RollInterval == options.RollInterval)
                 {
-                    this._writer.SetLimits(options.MaxFileSizeInBytes, options.MaxNumberFiles);
+                    this._writer.SetLimits(options.MaxFileSizeInBytes, options.MaxNumberFiles, options.FlushToDisk);
                 }
                 else
                 {
                     // else swap out the writer and close the old one 
-                    var newWriter = new FileWriter(options.Path, options.MaxFileSizeInBytes, options.MaxNumberFiles, options.Append, options.RollInterval);
+                    var newWriter = new FileWriter(options.Path, options.MaxFileSizeInBytes, options.MaxNumberFiles, options.Append, options.RollInterval, options.FlushToDisk);
 
                     FileWriter oldWriter = Interlocked.Exchange(ref this._writer, newWriter) as FileWriter;
 
@@ -84,7 +92,14 @@ namespace Bleess.Extensions.Logging.File
             {
                 foreach (LogMessageEntry message in _messageQueue.GetConsumingEnumerable())
                 {
-                    _writer?.WriteMessage(message.Message, _messageQueue.Count == 0);
+                    bool flush = _messageQueue.Count == 0 || (_lastFlush != null && _lastFlush.ElapsedMilliseconds >= _maxFlushInterval);
+
+                    _writer?.WriteMessage(message.Message, flush);
+
+                    if (flush && _lastFlush != null) 
+                    {
+                        _lastFlush.Restart();
+                    }
                 }
             }
             catch
@@ -99,6 +114,7 @@ namespace Bleess.Extensions.Logging.File
 
         public void Dispose()
         {
+            _lastFlush?.Stop();
             _messageQueue.CompleteAdding();
 
             try

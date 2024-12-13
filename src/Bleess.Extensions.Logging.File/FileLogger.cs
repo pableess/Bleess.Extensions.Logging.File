@@ -9,67 +9,65 @@ namespace Bleess.Extensions.Logging.File
 {
     // adapted from ConsoleLogger from https://github.com/dotnet/runtime
     class FileLogger : ILogger
-    {
-            private readonly string _name;
-            private readonly FileLoggerProcessor _queueProcessor;
+    {   
+        private readonly string _name;
+        private readonly FileLoggerProcessor _queueProcessor;
 
-            internal FileLogger(string name, FileLoggerProcessor loggerProcessor)
+        internal FileLogger(string name, FileLoggerProcessor loggerProcessor)
+        {
+            if (name == null)
             {
-                if (name == null)
-                {
-                    throw new ArgumentNullException(nameof(name));
-                }
-
-                _name = name;
-                _queueProcessor = loggerProcessor;
+                throw new ArgumentNullException(nameof(name));
             }
 
-            internal FileFormatter Formatter { get; set; }
+            _name = name;
+            _queueProcessor = loggerProcessor;
+        }
 
-            /// fallback setting to include scopes, deprecated API for setting this on the log provider
-            internal bool? FallbackIncludeScope { get; set; }
-            
-            internal string SubProviderName { get; set; }
+        internal FileFormatter Formatter { get; set; }
 
-            internal IExternalScopeProvider ScopeProvider { get; set; }
+        /// fallback setting to include scopes, deprecated API for setting this on the log provider
+        internal bool? FallbackIncludeScope { get; set; }
 
-            [ThreadStatic]
-            private static StringWriter t_stringWriter;
+        internal string SubProviderName { get; set; }
 
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        internal IExternalScopeProvider ScopeProvider { get; set; }
+
+        [ThreadStatic]
+        private static StringWriter t_stringWriter;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        {
+            if (!IsEnabled(logLevel))
             {
-                if (!IsEnabled(logLevel))
-                {
-                    return;
-                }
-                if (formatter == null)
-                {
-                    throw new ArgumentNullException(nameof(formatter));
-                }
-                t_stringWriter ??= new StringWriter();
-                LogEntry<TState> logEntry = new LogEntry<TState>(logLevel, _name, eventId, state, exception, formatter);
-                Formatter.Write(in logEntry, ScopeProvider, t_stringWriter, SubProviderName, FallbackIncludeScope);
-
-                var sb = t_stringWriter.GetStringBuilder();
-                if (sb.Length == 0)
-                {
-                    return;
-                }
-                string computedAnsiString = sb.ToString();
-                sb.Clear();
-                if (sb.Capacity > 1024)
-                {
-                    sb.Capacity = 1024;
-                }
-                _queueProcessor.EnqueueMessage(new LogMessageEntry(computedAnsiString));
+                return;
             }
-
-            public bool IsEnabled(LogLevel logLevel)
+            if (formatter == null)
             {
-                return logLevel != LogLevel.None;
+                throw new ArgumentNullException(nameof(formatter));
             }
+            t_stringWriter ??= new StringWriter();
+            LogEntry<TState> logEntry = new LogEntry<TState>(logLevel, _name, eventId, state, exception, formatter);
+            Formatter.Write(in logEntry, ScopeProvider, t_stringWriter, SubProviderName, FallbackIncludeScope);
 
-            public IDisposable BeginScope<TState>(TState state) => ScopeProvider?.Push(state) ?? NullScope.Instance;
+            var sb = t_stringWriter.GetStringBuilder();
+            if (sb.Length == 0)
+            {
+                return;
+            }
+            string computedAnsiString = sb.ToString();
+            sb.Clear();
+            if (sb.Capacity > 1024)
+            {
+                sb.Capacity = 1024;
+            }
+            var msg = new LogMessageEntry(computedAnsiString);
+            _queueProcessor.EnqueueMessage(ref msg);
+        }
+
+        public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
+
+        public IDisposable BeginScope<TState>(TState state) => ScopeProvider?.Push(state) ?? NullScope.Instance;
     }
 
     internal class NullScope : IDisposable

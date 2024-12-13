@@ -37,6 +37,8 @@ Below is a sample configuration for the file provider.  The values shown are the
       "MaxFileSizeInMB": 50,  // this can be decimal
       "FormatterName": "simple",  // simple or json
       "Append": true,
+      "FlushToDisk" : false, // true to indicate that flush operations should flush all the way to disk (ie fsync)
+      "MaxFlushInterval" : null, // max ms for which to allow before a flush operation on log writes
       "formatterOptions" : { 
           // see formatter options below 
       }
@@ -140,15 +142,19 @@ Example configuration
  Log files can have a max file size at which time a new file will be create with a incremented id appended.  You may also specify a maximum number of files to retain.  Once the maximum number of files has been reached, the oldest will be overwritten.
  Using RollInterval setting, you can also specify that a date will be appended to the file name and the files will roll according to the date in 'yyyyMMddHH' format.
 
- ## Custom Formatters
+## Custom Formatters
 
  To implment a custom formatter, create a class that derives from ```FileFormatter<TOptions>```.  Then register the formatter using a name and specify that name on the Logger options
 
- ## Benchmarks
+## Flush behavior
+ 
+ For performance reasons, this library uses a message queue and a dedicated thread for writing log messages to the file.  By default, a flush() is called when the write thread empties the queue of log messages.  In situations where there is a high throughput of log messages, file buffers may not flush for quite some time as the queue is not cleared.  You can optionally specify a maximum amount of time in (MaxFlushInterval) ms to go without a file flush operation. A value of 0 would force a flush on every messsage write. Note that even a flush() operation may not actually ensure that the data is written to the physical disk. By default, the flush ensures that the data is written to the drive cache.  If you wish to ensure that a flush will ensure the data is written to disk set "FlushToDisk" to true.  This could have some minor performance implications.
 
- The library has be benchmarked against a couple of other popular file loggers for .NET core.  Specically NReco and Karambolo loggers. See the results below.
+## Benchmarks
 
- #### Simple Text Message
+ The library has been benchmarked against a couple of other popular file loggers for .NET core.  Specically NReco and Karambolo loggers. See the results below.
+
+#### Simple Text Message
  ```
 
 BenchmarkDotNet v0.13.12, Windows 11 (10.0.22631.3007/23H2/2023Update/SunValley3)

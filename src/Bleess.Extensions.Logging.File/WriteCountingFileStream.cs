@@ -11,12 +11,12 @@ namespace Bleess.Extensions.Logging.File
     /// Accessing a FileStream's length, results in an platform I/O call.  This stream wrapper will track written bytes.
     /// Not suitable for random seeking.  If stream's position is set, then the length will reset to that position
     /// </summary>
-    internal class WriteCountingStream : Stream
+    internal class WriteCountingFileStream : Stream
     {
-        private readonly Stream _stream;
+        private readonly FileStream _stream;
         private long _length;
 
-        public WriteCountingStream(Stream stream)
+        public WriteCountingFileStream(FileStream stream)
         {
             if (stream == null) throw new ArgumentNullException(nameof(stream));
 
@@ -44,6 +44,8 @@ namespace Bleess.Extensions.Logging.File
         } 
 
         public override void Flush() => _stream.Flush();
+
+        public void Flush(bool flushToDisk) => _stream.Flush(flushToDisk);
 
         public override int Read(byte[] buffer, int offset, int count) => _stream.Read(buffer, offset, count);
 
@@ -89,7 +91,7 @@ namespace Bleess.Extensions.Logging.File
         /// Wraps the stream with a write counting stream
         /// </summary>
         /// <returns></returns>
-        public static Stream ToWriteCountingStream(this Stream stream) => new WriteCountingStream(stream);
+        public static WriteCountingFileStream ToWriteCountingStream(this FileStream stream) => new WriteCountingFileStream(stream);
     }
 
 }

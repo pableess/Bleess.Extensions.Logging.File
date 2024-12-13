@@ -102,14 +102,10 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
 
     private void WriteLevelAndCategory<TState>(TextWriter textWriter, LogEntry<TState> logEntry) 
     {
-        StringBuilder b = new StringBuilder(LoglevelPadding);
-        b.Append(logEntry.Category);
-
-        b.Append(" [");
-        b.Append(logEntry.EventId.Id);
-        b.Append("]");
-
-        textWriter.Write(b.ToString());
+        textWriter.Write(logEntry.Category);
+        textWriter.Write(" [");
+        textWriter.Write(logEntry.EventId.Id);
+        textWriter.Write("]");
     }
 
     private void WriteMessage(TextWriter textWriter, string message, bool singleLine)

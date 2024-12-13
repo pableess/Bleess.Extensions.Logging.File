@@ -30,9 +30,10 @@ namespace Bleess.Extensions.Logging.File
     {
         static TraceSource ts = new TraceSource(typeof(FileWriter).FullName);
 
-        private Stream logFileStream;
+        private WriteCountingFileStream logFileStream;
         private TextWriter logFileWriter;
         private long fileSizeLimitBytes;
+        private bool flushToDisk;
         private int maxRollingFiles;
         private bool append;
         private bool hasOpened;
@@ -43,13 +44,14 @@ namespace Bleess.Extensions.Logging.File
 
         private readonly object limitsLock = new object();
 
-        internal FileWriter(string path, long fileSizeLimitBytes, int maxRollingFiles, bool append, RollingInterval rollInterval)
+        internal FileWriter(string path, long fileSizeLimitBytes, int maxRollingFiles, bool append, RollingInterval rollInterval, bool flushToDisk)
         {
             this.FilePath = path;
             this.fileSizeLimitBytes = fileSizeLimitBytes;
             this.maxRollingFiles = maxRollingFiles;
             this.RollInterval = rollInterval;
             this.rollingFileInfo = new RollingFileInfo(path, rollInterval, false);
+            this.flushToDisk = flushToDisk;
 
             this.append = append;
          }
@@ -64,7 +66,8 @@ namespace Bleess.Extensions.Logging.File
         /// </summary>
         /// <param name="fileSizeLimitBytes"></param>
         /// <param name="maxRollingFile"></param>
-        public void SetLimits(long fileSizeLimitBytes, int maxRollingFile)
+        /// <param name="flushToDisk"></param>
+        public void SetLimits(long fileSizeLimitBytes, int maxRollingFile, bool flushToDisk)
         {
             // we only really need to lock on the max number of files
             // and only protected it when rolling to a new file
@@ -72,6 +75,7 @@ namespace Bleess.Extensions.Logging.File
             // for performance reasons we dont need to lock on size lime as we can just do an atomic read
             lock (limitsLock)
             {
+                this.flushToDisk = flushToDisk;
                 this.checkExtraFiles = true;
                 Interlocked.Exchange(ref this.fileSizeLimitBytes, fileSizeLimitBytes);
                 this.maxRollingFiles = maxRollingFile;
@@ -201,7 +205,7 @@ namespace Bleess.Extensions.Logging.File
                 if (flush)
                 {
                     logFileWriter.Flush();
-                    logFileStream.Flush();
+                    logFileStream.Flush(this.flushToDisk);
                 }
             }
         }
@@ -219,7 +223,6 @@ namespace Bleess.Extensions.Logging.File
                 logFileStream.Dispose();
                 logFileStream = null;
             }
-
         }
     }
 }
