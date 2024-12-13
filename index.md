@@ -161,7 +161,7 @@ IterationCount=10  LaunchCount=2  WarmupCount=10
 ```
 
 | Method                 | Mean            | Error         | StdDev        | Gen0      | Gen1     | Allocated  |
-|----------------------- |----------------:|--------------:|--------------:|----------:|---------:|-----------:|
+|----------------------- |-----------------|---------------|---------------|-----------|----------|------------|
 | Bleess_single_write    |        659.6 ns |      20.31 ns |      22.57 ns |    0.1068 |   0.0038 |      904 B |
 | Karambolo_single_write |        679.7 ns |      82.32 ns |      94.80 ns |    0.0839 |        - |      706 B |
 | NReco_single_write     |      1,547.5 ns |      13.10 ns |      14.56 ns |    0.1640 |   0.0057 |     1373 B |
@@ -181,8 +181,9 @@ AMD Ryzen 5 5600H with Radeon Graphics, 1 CPU, 12 logical and 6 physical cores
 IterationCount=10  LaunchCount=2  WarmupCount=10  
 
 ```
+
 | Method                      | Mean     | Error     | StdDev    | Gen0   | Gen1   | Gen2   | Allocated |
-|---------------------------- |---------:|----------:|----------:|-------:|-------:|-------:|----------:|
+|---------------------------- |----------|-----------|-----------|--------|--------|--------|-----------|
 | Bleess_single_write_json    | 1.990 μs | 0.0469 μs | 0.0521 μs | 0.9766 |      - |      - |   7.99 KB |
 | Karambolo_single_write_json | 2.118 μs | 0.1781 μs | 0.2051 μs | 0.3204 | 0.0458 | 0.0153 |   2.65 KB |
 
@@ -199,8 +200,9 @@ AMD Ryzen 5 5600H with Radeon Graphics, 1 CPU, 12 logical and 6 physical cores
 IterationCount=10  LaunchCount=2  WarmupCount=10  
 
 ```
+
 | Method                           | Mean     | Error     | StdDev    | Gen0   | Gen1   | Allocated |
-|--------------------------------- |---------:|----------:|----------:|-------:|-------:|----------:|
+|--------------------------------- |----------|-----------|-----------|--------|--------|-----------|
 | Bleess_multifile_single_write    | 1.374 μs | 0.0396 μs | 0.0441 μs | 0.1984 |      - |   1.67 KB |
 | Karambolo_multifile_single_write | 1.554 μs | 0.1430 μs | 0.1647 μs | 0.1602 | 0.0229 |   1.33 KB |
 
