@@ -25,7 +25,7 @@
     <PackageId>Bleess.Extensions.Logging.File</PackageId>
     <PackageTags>microsoft-extensions-logging;log;file;file-logging;logging;aspnetcore;file-logger;logging-provider;netcore</PackageTags>
     <PackageProjectUrl>https://github.com/pableess/Bleess.Extensions.Logging.File</PackageProjectUrl>
-    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
     <PackageReleaseNotes>
@@ -57,7 +57,6 @@
 
   <ItemGroup>
     <None Include="$(RepoRoot)\README.md" Pack="true" PackagePath="\" />
-    <None Include="$(RepoRoot)\LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <PropertyGroup Condition="'$(TF_BUILD)' == 'true'">
