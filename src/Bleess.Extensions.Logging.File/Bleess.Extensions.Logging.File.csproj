@@ -10,7 +10,7 @@
 
     <BuildNum>1</BuildNum>
     
-    <VersionPrefix>3.0.0</VersionPrefix>
+    <VersionPrefix>3.0.1</VersionPrefix>
     <VersionSuffix></VersionSuffix>
 
     <FileVersion>$(VersionPrefix).$(BuildNum)</FileVersion>
