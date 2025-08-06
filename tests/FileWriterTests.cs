@@ -17,7 +17,7 @@ namespace Tests
         {
             try
             {
-                FileWriter w = new FileWriter("logs/fw.txt", 1024, 4, false, RollingInterval.Infinite);
+                FileWriter w = new FileWriter("logs/fw.txt", 1024, 4, false, RollingInterval.Infinite, false);
 
                 for (int i = 0; i < 5000; i++)
                 {
@@ -29,7 +29,7 @@ namespace Tests
                 // try this on the background thread to test the threading
                 Task.Run(() =>
                 {
-                    w.SetLimits(1024, 2);
+                    w.SetLimits(1024, 2, false);
                 });
 
                 for (int i = 0; i < 50000; i++)
