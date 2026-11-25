@@ -36,10 +36,12 @@ Publishing runs from `.github/workflows/publish.yml` and uses [NuGet trusted pub
    - **Workflow File:** `publish.yml` (the file name only)
    - **Environment:** leave empty
 2. Add a `NUGET_USER` repository secret containing your nuget.org profile name (not your email address).
-3. Tag the release commit and push the tag, for example `git tag v4.0.1 && git push origin v4.0.1`.
-4. The workflow builds and tests on `net8.0`, `net10.0` and `net11.0`, packs `Bleess.Extensions.Logging.File.<version>.nupkg`, exchanges the GitHub OIDC token for a short-lived API key and pushes the package to nuget.org.
+3. Bump `VersionPrefix` (and `VersionSuffix` for a prerelease) in `src/Bleess.Extensions.Logging.File/Bleess.Extensions.Logging.File.csproj` and add the matching `## [<version>]` section to `CHANGELOG.md`.
+4. Merge the release changes, then tag the release commit and push the tag, for example `git tag v4.0.2 && git push origin v4.0.2`.
+5. The workflow verifies that the tag matches `PackageVersion` in the csproj and that the changelog has an entry. It then builds and tests on `net8.0`, `net10.0` and `net11.0`, packs `Bleess.Extensions.Logging.File.<version>.nupkg`, exchanges the GitHub OIDC token for a short-lived API key and pushes the package to nuget.org.
+6. The workflow creates a GitHub Release for the tag with the package attached and the matching changelog section as its notes. Prerelease versions are marked as prereleases on GitHub.
 
-The tag is the source of truth for the package version: the workflow passes it as `VersionPrefix`/`VersionSuffix`, so the project file does not need to be edited for each release. A tag such as `v4.1.0-rc.1` produces a prerelease package. The workflow can also be started manually with a version input, and `--skip-duplicate` makes reruns safe.
+The csproj is the source of truth for the package version. A tag that does not match `PackageVersion` fails before anything is built or published. A tag such as `v4.1.0-rc.1` produces a prerelease package. The workflow can also be started manually with a version input, which must match the csproj version; manual runs publish to NuGet but skip the GitHub Release because there is no tag. `--skip-duplicate` makes reruns safe, and an existing release gets its package asset replaced.
 
 ## Conventions
 
