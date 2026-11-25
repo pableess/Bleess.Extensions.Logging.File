@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading.Tasks;
 
 #nullable enable
 
@@ -14,19 +12,19 @@ namespace Bleess.Extensions.Logging.File;
 /// <summary>
 /// Representation for the rolling file
 /// </summary>
-internal class RollingFileInfo
+internal sealed class RollingFileInfo
 {
     private const string SequenceFormat = "000";
     private const string Separator = "_";
     private readonly bool _utc;
-    private RollingInterval _rollInterval;
-    DateTime? _currentInterval;
+    private readonly RollingInterval _rollInterval;
+    private readonly TimeProvider _timeProvider;
+    private DateTime? _currentInterval;
     private string _formatted;
-    private string _filePathTemplateWithoutExtension;
-    private string _extension;
+    private readonly string _filePathTemplateWithoutExtension;
+    private readonly string _extension;
 
-    int _fileSequence = 0;
-    
+    private int _fileSequence;
 
     /// <summary>
     /// Creates an object to represent the rolling file
@@ -34,17 +32,15 @@ internal class RollingFileInfo
     /// <param name="template">the file path</param>
     /// <param name="interval">the rolling interval</param>
     /// <param name="utc">if the interval is utc</param>
-    public RollingFileInfo(string template, RollingInterval interval, bool utc)
+    /// <param name="timeProvider">the clock used for date rolling</param>
+    public RollingFileInfo(string template, RollingInterval interval, bool utc, TimeProvider timeProvider)
     {
+        _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
         _utc = utc;
         _rollInterval = interval;
         var expanded = Environment.ExpandEnvironmentVariables(template);
-        _extension = Path.GetExtension(expanded) ?? ".txt";
-        _filePathTemplateWithoutExtension = Path.ChangeExtension(expanded, null);
-
-        // get the output template
-        
-
+        _extension = Path.GetExtension(expanded);
+        _filePathTemplateWithoutExtension = Path.ChangeExtension(expanded, null) ?? expanded;
 
         // set the current date/time 
         _currentInterval = this.Now.Truncate(_rollInterval);
@@ -52,7 +48,16 @@ internal class RollingFileInfo
     }
 
 
-    public bool ShouldDateRoll() => Now.Truncate(_rollInterval) != _currentInterval;
+    public bool ShouldDateRoll()
+    {
+        // nothing to roll when the interval is infinite; avoid reading the clock on the hot path
+        if (_rollInterval == RollingInterval.Infinite)
+        {
+            return false;
+        }
+
+        return Now.Truncate(_rollInterval) != _currentInterval;
+    }
 
     public string CurrentFile => _formatted;
 
@@ -86,50 +91,49 @@ internal class RollingFileInfo
     /// <summary>
     /// set current the rolling file info based on the contents of the files in the directory
     /// </summary>
-    public bool AlignToDirectory() 
+    public bool AlignToDirectory()
     {
-        var path = Path.ChangeExtension(_filePathTemplateWithoutExtension, _extension);
-        var logFileMask = Path.GetFileName(_filePathTemplateWithoutExtension) + "*" + _extension;
-
-        var logDir = Path.GetDirectoryName(path);
+        var logDir = Path.GetDirectoryName(_filePathTemplateWithoutExtension);
         // no files yet
-        if (!Directory.Exists(logDir) || logDir == null)
+        if (string.IsNullOrEmpty(logDir) || !Directory.Exists(logDir))
         {
             return false;
         }
 
+        var logFileMask = GetFileMask();
+
         var logFiles = Directory.GetFiles(logDir, logFileMask, SearchOption.TopDirectoryOnly);
-        if (logFiles?.Length > 0)
+        if (logFiles.Length > 0)
         {
             var lastFileInfo = logFiles
                     .Select(fName => new FileInfo(fName))
-                    .OrderByDescending(fInfo => fInfo.LastWriteTime).First();
+                    .OrderByDescending(fInfo => fInfo.LastWriteTimeUtc)
+                    .First();
 
-            var current = Path.GetFileName(GetFileName(_currentInterval, 0));
+            // the base name for this interval, without a sequence number, for example "log_20240115" or "log"
+            string currentBase = Path.GetFileNameWithoutExtension(GetFileName(_currentInterval, 0));
+            string lastBase = Path.GetFileNameWithoutExtension(lastFileInfo.Name);
 
-            // if the dates match, then parse the sequence number
-            if (lastFileInfo.Name.StartsWith(Path.GetFileNameWithoutExtension(current)))
+            // the newest file belongs to the current interval but has no sequence number
+            if (string.Equals(lastBase, currentBase, StringComparison.OrdinalIgnoreCase))
             {
-                var lastFileName = Path.GetFileNameWithoutExtension(lastFileInfo.Name);
+                _fileSequence = 0;
+                return true;
+            }
 
-                int index = lastFileName.LastIndexOf(Separator);
-                if (index < 0 || index == lastFileName.Length - 1)
+            // only a suffix that follows the date part can be a sequence. Comparing against the date part
+            // itself would treat "log_20240115" as sequence 20240115.
+            if (lastBase.StartsWith(currentBase + Separator, StringComparison.OrdinalIgnoreCase))
+            {
+                var fileSeq = lastBase.Substring(currentBase.Length + Separator.Length);
+
+                if (int.TryParse(fileSeq, NumberStyles.None, CultureInfo.InvariantCulture, out int parsedSequence))
                 {
-                    _fileSequence = 0;
-                }
-                else 
-                {
-                    // if the file has a sequence num, try to parse it
-                    var fileSeq = lastFileName.Substring(index + 1);
+                    _fileSequence = parsedSequence;
 
-                    if (fileSeq.Length == SequenceFormat.Length)
-                    {
-                        int.TryParse(fileSeq, out _fileSequence);
-
-                        // update the cached formatted file name
-                        _formatted = GetFileName(_currentInterval, _fileSequence);
-                        return true;
-                    }
+                    // update the cached formatted file name
+                    _formatted = GetFileName(_currentInterval, _fileSequence);
+                    return true;
                 }
             }
         }
@@ -141,29 +145,34 @@ internal class RollingFileInfo
     ///  Gets a sorts list of matching files
     /// </summary>
     /// <returns></returns>
-    public IEnumerable<FileInfo> GetMatchingFilesByOldest()
+    public FileInfo[] GetMatchingFilesByOldest()
     {
-        var path = Path.ChangeExtension(_filePathTemplateWithoutExtension, _extension);
-        var logFileMask = Path.GetFileNameWithoutExtension(_filePathTemplateWithoutExtension) + "*" + _extension;
+        var logDir = Path.GetDirectoryName(_filePathTemplateWithoutExtension);
 
-        var logDir = Path.GetDirectoryName(path);
-
-        if (logDir != null)
+        if (string.IsNullOrEmpty(logDir) || !Directory.Exists(logDir))
         {
-            // check for files that have exceed max
-            // this only happens when reducing the file size
-            var matchingFiles = Directory.GetFiles(logDir, logFileMask, SearchOption.TopDirectoryOnly).Select(f => new FileInfo(f));
-
-            // currently just sorting using last write time
-            return matchingFiles.OrderBy(f => f.LastWriteTimeUtc).ToArray();
+            return Array.Empty<FileInfo>();
         }
 
-        return Array.Empty<FileInfo>();
+        // check for files that have exceed max
+        // this only happens when reducing the file size
+        return Directory.GetFiles(logDir, GetFileMask(), SearchOption.TopDirectoryOnly)
+            .Select(f => new FileInfo(f))
+            // currently just sorting using last write time
+            .OrderBy(f => f.LastWriteTimeUtc)
+            .ToArray();
     }
 
-    private DateTime Now => _utc ? DateTime.UtcNow : DateTime.Now;
+    private string GetFileMask()
+    {
+        return Path.GetFileNameWithoutExtension(_filePathTemplateWithoutExtension) + "*" + _extension;
+    }
 
-    private static string? GetSequenceString(int sequenceNumber) => sequenceNumber == 0 ? null : sequenceNumber.ToString(SequenceFormat);
+    private DateTime Now => _utc
+        ? _timeProvider.GetUtcNow().UtcDateTime
+        : _timeProvider.GetLocalNow().DateTime;
+
+    private static string? GetSequenceString(int sequenceNumber) => sequenceNumber == 0 ? null : sequenceNumber.ToString(SequenceFormat, CultureInfo.InvariantCulture);
 
     private string GetFileName(DateTime? dateTime, int seqenceNum)
     {
@@ -174,29 +183,18 @@ internal class RollingFileInfo
         var datePart = dateTime.ToFormattedString(_rollInterval);
 
         if (!string.IsNullOrEmpty(datePart))
-        { 
-            builder.Append(Separator);
+        {
+            builder.Append(Separator[0]);
             builder.Append(datePart);
         }
         if (!string.IsNullOrEmpty(seq))
         {
-            builder.Append(Separator);
+            builder.Append(Separator[0]);
             builder.Append(seq);
         }
 
-        // set the formatted file path
-        return Path.ChangeExtension(builder.ToString(), _extension);
+        // Path.ChangeExtension with an empty extension would append a trailing '.'
+        var name = builder.ToString();
+        return string.IsNullOrEmpty(_extension) ? name : Path.ChangeExtension(name, _extension);
     }
-
-    public static int CountSubstring(string text, string value)
-    {
-        int count = 0, minIndex = text.IndexOf(value, 0);
-        while (minIndex != -1)
-        {
-            minIndex = text.IndexOf(value, minIndex + value.Length);
-            count++;
-        }
-        return count;
-    }
-
 }

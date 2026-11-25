@@ -3,9 +3,9 @@ using Microsoft.Extensions.Logging.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using static System.Collections.Specialized.BitVector32;
+using System.Diagnostics.CodeAnalysis;
+
+#nullable enable
 
 namespace Bleess.Extensions.Logging.File
 {
@@ -17,6 +17,9 @@ namespace Bleess.Extensions.Logging.File
         }
     }
 
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Options are bound from configuration. This is the same reflection requirement as the built-in Microsoft.Extensions.Logging providers; trimmed apps must preserve their options members.")]
+    [UnconditionalSuppressMessage("Aot", "IL3050", Justification = "See IL2026: configuration binding of TOptions requires reflection.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2091", Justification = "TOptions is supplied by the application and bound from configuration.")]
     internal class CompositeFileLoggerFormatterConfigureOptions<TOptions> : IConfigureNamedOptions<TOptions>
         where TOptions : class
     {
@@ -27,7 +30,7 @@ namespace Bleess.Extensions.Logging.File
             _configuration = providerConfiguration.Configuration;
         }
 
-        public void Configure(string name, TOptions options)
+        public void Configure(string? name, TOptions options)
         {
             if (!string.IsNullOrEmpty(name))
             {
@@ -38,7 +41,7 @@ namespace Bleess.Extensions.Logging.File
 
                 formatterOptions.Bind(options);
             }
-            else             
+            else
             {
                 this.Configure(options);
             }

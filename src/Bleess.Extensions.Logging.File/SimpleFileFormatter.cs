@@ -1,40 +1,38 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Text;
-using System.Threading;
 
 #nullable enable
 
 namespace Bleess.Extensions.Logging.File;
 
-internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
+internal sealed class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
 {
     private const string LoglevelPadding = ": ";
-    private static readonly string _messagePadding = new string(' ', GetLogLevelString(LogLevel.Information).Length + LoglevelPadding.Length);
-    private static readonly string _newLineWithMessagePadding = Environment.NewLine + _messagePadding;
+    private static readonly string s_messagePadding = new string(' ', GetLogLevelString(LogLevel.Information).Length + LoglevelPadding.Length);
+    private static readonly string s_newLineWithMessagePadding = Environment.NewLine + s_messagePadding;
 
     /// <summary>
     /// Create a <see cref="SimpleFileFormatter"/>
     /// </summary>
     /// <param name="options"></param>
-    public SimpleFileFormatter(IOptionsMonitor<SimpleFileFormatterOptions> options)
-        : base(FileFormatterNames.Simple, options)
+    /// <param name="timeProvider"></param>
+    public SimpleFileFormatter(IOptionsMonitor<SimpleFileFormatterOptions> options, TimeProvider timeProvider)
+        : base(FileFormatterNames.Simple, options, timeProvider)
     {
     }
 
-    public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider scopeProvider, TextWriter textWriter, string? subProviderName = null, bool? fallbackIncludeScope = null)
+    public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider? scopeProvider, TextWriter textWriter, string? subProviderName = null, bool? fallbackIncludeScope = null)
     {
         var formatterOptions = this.GetOptions(subProviderName);
 
-        // support obsolete include scope from the provider config, if not set on the formatter
-        formatterOptions.IncludeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScope;
+        // support obsolete include scope from the provider config, if not set on the formatter.
+        // the options instance is shared, so do not mutate it here.
+        bool includeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScope ?? false;
 
-        string message = logEntry.Formatter(logEntry.State, logEntry.Exception);
+        string? message = logEntry.Formatter(logEntry.State, logEntry.Exception);
         if (logEntry.Exception == null && message == null)
         {
             return;
@@ -43,7 +41,7 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
         string logLevelString = GetLogLevelString(logLevel);
 
         string? timestamp = null;
-        string timestampFormat = formatterOptions.TimestampFormat;
+        string? timestampFormat = formatterOptions.TimestampFormat;
         if (timestampFormat != null)
         {
             DateTimeOffset dateTimeOffset = GetCurrentDateTime(formatterOptions);
@@ -54,7 +52,7 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
             }
             else
             {
-                timestamp = dateTimeOffset.ToString(timestampFormat) + " ";
+                timestamp = dateTimeOffset.ToString(timestampFormat, CultureInfo.CurrentCulture) + " ";
             }
         }
         if (timestamp != null)
@@ -63,23 +61,24 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
         }
         if (logLevelString != null)
         {
-            textWriter.Write($" {logLevelString}");
+            textWriter.Write(' ');
+            textWriter.Write(logLevelString);
         }
-        CreateDefaultLogMessage(textWriter, logEntry, message, scopeProvider, formatterOptions);
+        CreateDefaultLogMessage(textWriter, logEntry, message, scopeProvider, formatterOptions, includeScopes);
     }
 
-    private void CreateDefaultLogMessage<TState>(TextWriter textWriter, in LogEntry<TState> logEntry, string message, IExternalScopeProvider scopeProvider, SimpleFileFormatterOptions formatterOptions)
+    private static void CreateDefaultLogMessage<TState>(TextWriter textWriter, in LogEntry<TState> logEntry, string? message, IExternalScopeProvider? scopeProvider, SimpleFileFormatterOptions formatterOptions, bool includeScopes)
     {
         bool singleLine = formatterOptions.SingleLine;
-        
-        Exception exception = logEntry.Exception;
+
+        Exception? exception = logEntry.Exception;
 
         // Example:
         // info: ConsoleApp.Program[10]
         //       Request received
 
         // category and event id
-        WriteCategoryAndEventId<TState>(textWriter, logEntry);
+        WriteCategoryAndEventId(textWriter, logEntry);
 
         WriteMessage(textWriter, message, singleLine);
 
@@ -92,7 +91,7 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
             WriteMessage(textWriter, exception.ToString(), singleLine);
         }
 
-        WriteScopeInformation(textWriter, scopeProvider, singleLine, formatterOptions);
+        WriteScopeInformation(textWriter, scopeProvider, singleLine, includeScopes);
 
         if (formatterOptions.EmptyLineBetweenMessages)
         {
@@ -100,7 +99,7 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
         }
     }
 
-    private void WriteCategoryAndEventId<TState>(TextWriter textWriter, LogEntry<TState> logEntry) 
+    private static void WriteCategoryAndEventId<TState>(TextWriter textWriter, LogEntry<TState> logEntry)
     {
         textWriter.Write(LoglevelPadding);
         textWriter.Write(logEntry.Category);
@@ -109,35 +108,28 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
         textWriter.Write("]");
     }
 
-    private void WriteMessage(TextWriter textWriter, string message, bool singleLine)
+    private static void WriteMessage(TextWriter textWriter, string? message, bool singleLine)
     {
         if (!string.IsNullOrEmpty(message))
         {
             if (singleLine)
             {
                 textWriter.Write(' ');
-                WriteReplacing(textWriter, Environment.NewLine, " ", message);
+                textWriter.Write(message.Replace(Environment.NewLine, " "));
             }
             else
             {
                 textWriter.Write(Environment.NewLine);
 
-                textWriter.Write(_messagePadding);
-                WriteReplacing(textWriter, Environment.NewLine, _newLineWithMessagePadding, message);
+                textWriter.Write(s_messagePadding);
+                textWriter.Write(message.Replace(Environment.NewLine, s_newLineWithMessagePadding));
             }
-
-        }
-
-        static void WriteReplacing(TextWriter writer, string oldValue, string newValue, string message)
-        {
-            string newMessage = message.Replace(oldValue, newValue);
-            writer.Write(newMessage);
         }
     }
 
     private DateTimeOffset GetCurrentDateTime(SimpleFileFormatterOptions formatterOptions)
     {
-        return formatterOptions.UseUtcTimestamp ? DateTimeOffset.UtcNow : DateTimeOffset.Now;
+        return formatterOptions.UseUtcTimestamp ? TimeProvider.GetUtcNow() : TimeProvider.GetLocalNow();
     }
 
     private static string GetLogLevelString(LogLevel logLevel)
@@ -153,32 +145,32 @@ internal class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOptions>
             _ => throw new ArgumentOutOfRangeException(nameof(logLevel))
         };
     }
-   
-    private void WriteScopeInformation(TextWriter textWriter, IExternalScopeProvider scopeProvider, bool singleLine, SimpleFileFormatterOptions formatterOptions)
+
+    private static void WriteScopeInformation(TextWriter textWriter, IExternalScopeProvider? scopeProvider, bool singleLine, bool includeScopes)
     {
-        if (formatterOptions.IncludeScopes == true && scopeProvider != null)
+        if (!includeScopes || scopeProvider == null)
         {
-            bool paddingNeeded = !singleLine;
-
-         
-
-            scopeProvider.ForEachScope((scope, state) =>
-            {
-                if (!singleLine)
-                {
-                    textWriter.Write(Environment.NewLine);
-                }
-
-                if (paddingNeeded)
-                {
-                    state.Write(_messagePadding + "=> ");
-                }
-                else
-                {
-                    state.Write(" => ");
-                }
-                state.Write(scope);
-            }, textWriter);
+            return;
         }
+
+        bool paddingNeeded = !singleLine;
+
+        scopeProvider.ForEachScope((scope, state) =>
+        {
+            if (!singleLine)
+            {
+                state.Write(Environment.NewLine);
+            }
+
+            if (paddingNeeded)
+            {
+                state.Write(s_messagePadding + "=> ");
+            }
+            else
+            {
+                state.Write(" => ");
+            }
+            state.Write(scope);
+        }, textWriter);
     }
 }

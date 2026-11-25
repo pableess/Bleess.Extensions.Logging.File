@@ -1,7 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Text;
 
 #nullable enable
 
@@ -21,7 +19,7 @@ internal readonly struct SubFileLoggerInfo
 
     public FileLogger Logger { get; }
 
-    public LogLevel? MinLevel{ get; }
+    public LogLevel? MinLevel { get; }
 
     public Func<string?, string?, LogLevel, bool>? Filter { get; }
 }

@@ -5,7 +5,7 @@ namespace Bleess.Extensions.Logging.File
     /// <summary>
     /// Options for FileLogger.
     /// </summary>
-    public record class FileLoggerOptions
+    public sealed record class FileLoggerOptions
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="FileLoggerOptions"/> class.
@@ -17,7 +17,7 @@ namespace Bleess.Extensions.Logging.File
         /// <summary>
         /// Include scopes in the log output
         /// </summary>
-        [System.ObsoleteAttribute("FileLoggerOptions.IncludeScopes has been deprecated. Use FileFormatterOptions.IncludeScopes instead.")]
+        [Obsolete("FileLoggerOptions.IncludeScopes has been deprecated. Use FileFormatterOptions.IncludeScopes instead.")]
         public bool IncludeScopes { get; set; } = true;
 
 
@@ -36,7 +36,7 @@ namespace Bleess.Extensions.Logging.File
         public string Path { get; set; } = "logs/log.txt";
 
         /// <summary>
-        /// Gets or sets the MaxFileSizeInMB.
+        /// Gets or sets the MaxFileSizeInMB. Set to 0 to disable rolling by size.
         /// </summary>
         /// <value>
         /// The MaxFileSizeInMB.
@@ -44,7 +44,8 @@ namespace Bleess.Extensions.Logging.File
         public float MaxFileSizeInMB { get; set; } = 50;
 
         /// <summary>
-        /// Gets or sets the MaxNumberFiles.
+        /// Gets or sets the maximum number of files to keep, including the file currently being written.
+        /// Must be at least 1.
         /// </summary>
         /// <value>
         /// The MaxNumberFiles.
@@ -57,6 +58,11 @@ namespace Bleess.Extensions.Logging.File
         public RollingInterval RollInterval { get; set; } = RollingInterval.Infinite;
 
         /// <summary>
+        /// Use UTC instead of local time for the date portion of a rolling file name.
+        /// </summary>
+        public bool UseUtcTimestamp { get; set; }
+
+        /// <summary>
         /// Whether or not to append to and existing file
         /// False will overwrite an existing log file
         /// </summary>
@@ -65,7 +71,7 @@ namespace Bleess.Extensions.Logging.File
         /// <summary>
         /// If true, forces the flush operations to ensure that all data is written to the underlying disk (ie fsync on linux)
         /// </summary>
-        public bool FlushToDisk { get; set; } = false;
+        public bool FlushToDisk { get; set; }
 
         /// <summary>
         /// In high throughput scenarios, log messages are queued up and written from a background thread.  

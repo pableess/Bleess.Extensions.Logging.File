@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Options;
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -13,21 +12,21 @@ using System.Text.Json;
 
 namespace Bleess.Extensions.Logging.File;
 
-internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
-{   
-    public JsonFileFormatter(IOptionsMonitor<JsonFileFormatterOptions> options)
-        : base(FileFormatterNames.Json, options)
+internal sealed class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
+{
+    public JsonFileFormatter(IOptionsMonitor<JsonFileFormatterOptions> options, TimeProvider timeProvider)
+        : base(FileFormatterNames.Json, options, timeProvider)
     {
     }
 
-    public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider scopeProvider, TextWriter textWriter, string? subProviderName, bool? fallbackIncludeScopes)
+    public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider? scopeProvider, TextWriter textWriter, string? subProviderName, bool? fallbackIncludeScopes)
     {
         JsonFileFormatterOptions formatterOptions = this.GetOptions(subProviderName);
-        
-        // support obsolete setting on the provider
-        formatterOptions.IncludeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScopes;
 
-        string message = logEntry.Formatter(logEntry.State, logEntry.Exception);
+        // support obsolete setting on the provider. the options instance is shared, so do not mutate it here.
+        bool includeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScopes ?? false;
+
+        string? message = logEntry.Formatter(logEntry.State, logEntry.Exception);
         if (logEntry.Exception == null && message == null)
         {
             return;
@@ -38,71 +37,77 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
         Exception? exception = logEntry.Exception;
         const int DefaultBufferSize = 1024;
 
-        byte[] buffer = ArrayPool<byte>.Shared.Rent(DefaultBufferSize);
+        var buffer = new PooledBufferWriter(DefaultBufferSize);
+        char[]? charBuffer = null;
         try
         {
-            using (MemoryStream mem = new MemoryStream(buffer))
+            using (var writer = new Utf8JsonWriter(buffer, formatterOptions.JsonWriterOptions))
             {
-                using (var writer = new Utf8JsonWriter(mem, formatterOptions.JsonWriterOptions))
+                writer.WriteStartObject();
+                string? timestampFormat = formatterOptions.TimestampFormat;
+                if (timestampFormat != null)
                 {
-                    writer.WriteStartObject();
-                    var timestampFormat = formatterOptions.TimestampFormat;
-                    if (timestampFormat != null)
+                    DateTimeOffset dateTimeOffset = formatterOptions.UseUtcTimestamp ? TimeProvider.GetUtcNow() : TimeProvider.GetLocalNow();
+                    if (formatterOptions.InvariantTimestampFormat)
                     {
-                        DateTimeOffset dateTimeOffset = formatterOptions.UseUtcTimestamp ? DateTimeOffset.UtcNow : DateTimeOffset.Now;
-                        if (formatterOptions.InvariantTimestampFormat)
-                        {
-                            writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat, CultureInfo.InvariantCulture));
-                        }
-                        else 
-                        {
-                            writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat));
-                        }
+                        writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat, CultureInfo.InvariantCulture));
                     }
-                    writer.WriteNumber(nameof(logEntry.EventId), eventId);
-                    writer.WriteString(nameof(logEntry.LogLevel), GetLogLevelString(logLevel));
-                    writer.WriteString(nameof(logEntry.Category), category);
-                    writer.WriteString("Message", message);
+                    else
+                    {
+                        writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat, CultureInfo.CurrentCulture));
+                    }
+                }
+                writer.WriteNumber(nameof(logEntry.EventId), eventId);
+                writer.WriteString(nameof(logEntry.LogLevel), GetLogLevelString(logLevel));
+                writer.WriteString(nameof(logEntry.Category), category);
+                writer.WriteString("Message", message);
 
-                    if (exception != null)
+                if (exception != null)
+                {
+                    string exceptionMessage = exception.ToString();
+                    if (!formatterOptions.JsonWriterOptions.Indented)
                     {
-                        string exceptionMessage = exception.ToString();
-                        if (!formatterOptions.JsonWriterOptions.Indented)
-                        {
-                            exceptionMessage = exceptionMessage.Replace(Environment.NewLine, " ");
-                        }
-                        writer.WriteString(nameof(Exception), exceptionMessage);
+                        exceptionMessage = exceptionMessage.Replace(Environment.NewLine, " ");
                     }
+                    writer.WriteString(nameof(Exception), exceptionMessage);
+                }
 
-                    if (logEntry.State != null)
+                if (logEntry.State != null)
+                {
+                    writer.WriteStartObject(nameof(logEntry.State));
+                    writer.WriteString("Message", logEntry.State.ToString());
+                    if (logEntry.State is IReadOnlyCollection<KeyValuePair<string, object>> stateProperties)
                     {
-                        writer.WriteStartObject(nameof(logEntry.State));
-                        writer.WriteString("Message", logEntry.State.ToString());
-                        if (logEntry.State is IReadOnlyCollection<KeyValuePair<string, object>> stateProperties)
+                        foreach (KeyValuePair<string, object> item in stateProperties)
                         {
-                            foreach (KeyValuePair<string, object> item in stateProperties)
-                            {
-                                WriteItem(writer, item);
-                            }
+                            WriteItem(writer, item);
                         }
-                        writer.WriteEndObject();
                     }
-                    WriteScopeInformation(writer, scopeProvider, formatterOptions);
                     writer.WriteEndObject();
-                    writer.Flush();
+                }
+                WriteScopeInformation(writer, scopeProvider, includeScopes);
+                writer.WriteEndObject();
+                writer.Flush();
 
-                    textWriter.Write(Encoding.UTF8.GetString(mem.ToArray(), 0, (int)writer.BytesCommitted));
+                // decode the written bytes without an intermediate string or array copy
+                int written = buffer.WrittenCount;
+                charBuffer = ArrayPool<char>.Shared.Rent(Encoding.UTF8.GetMaxCharCount(written));
+                int charCount = Encoding.UTF8.GetChars(buffer.WrittenSpan, charBuffer);
+                textWriter.Write(charBuffer.AsSpan(0, charCount));
 
-                    if (formatterOptions.EmptyLineBetweenMessages)
-                    {
-                        textWriter.Write(Environment.NewLine);
-                    }
+                if (formatterOptions.EmptyLineBetweenMessages)
+                {
+                    textWriter.Write(Environment.NewLine);
                 }
             }
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(buffer);
+            buffer.Dispose();
+            if (charBuffer is not null)
+            {
+                ArrayPool<char>.Shared.Return(charBuffer);
+            }
         }
     }
 
@@ -120,9 +125,9 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
         };
     }
 
-    private void WriteScopeInformation(Utf8JsonWriter writer, IExternalScopeProvider scopeProvider, JsonFileFormatterOptions formatterOptions)
+    private static void WriteScopeInformation(Utf8JsonWriter writer, IExternalScopeProvider? scopeProvider, bool includeScopes)
     {
-        if (formatterOptions.IncludeScopes == true && scopeProvider != null)
+        if (includeScopes && scopeProvider != null)
         {
             writer.WriteStartArray("Scopes");
             scopeProvider.ForEachScope((scope, state) =>
@@ -146,7 +151,7 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
         }
     }
 
-    private void WriteItem(Utf8JsonWriter writer, KeyValuePair<string, object> item)
+    private static void WriteItem(Utf8JsonWriter writer, KeyValuePair<string, object> item)
     {
         var key = item.Key;
         switch (item.Value)
@@ -161,11 +166,7 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
                 writer.WriteNumber(key, sbyteValue);
                 break;
             case char charValue:
-#if NET5_0_OR_GREATER
                 writer.WriteString(key, System.Runtime.InteropServices.MemoryMarshal.CreateSpan(ref charValue, 1));
-#else
-                writer.WriteString(key, charValue.ToString());
-#endif
                 break;
             case decimal decimalValue:
                 writer.WriteNumber(key, decimalValue);

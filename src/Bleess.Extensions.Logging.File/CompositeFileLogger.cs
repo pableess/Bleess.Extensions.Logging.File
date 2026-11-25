@@ -1,29 +1,27 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 #nullable enable
 
 namespace Bleess.Extensions.Logging.File;
 
 internal sealed class CompositeFileLogger : ILogger
-{   
+{
     // because sub providers don't change immutable dictionary will have less allocations on iteration
-    private volatile ImmutableDictionary<string, SubFileLoggerInfo> _loggers;
-    private IExternalScopeProvider? _scopeProvider;
+    private ImmutableDictionary<string, SubFileLoggerInfo> _loggers;
+    private volatile IExternalScopeProvider? _scopeProvider;
 
     public CompositeFileLogger(string category, IEnumerable<SubFileLoggerInfo> loggers, IExternalScopeProvider? scopeProvider)
     {
+        ArgumentNullException.ThrowIfNull(loggers);
+
         Category = category;
         _scopeProvider = scopeProvider;
         _loggers = ImmutableDictionary.CreateRange(
-            loggers.ToDictionary(l => l.SubProviderName, l => l)) ?? throw new ArgumentNullException(nameof(loggers));
+            loggers.ToDictionary(l => l.SubProviderName, l => l));
     }
 
     public IEnumerable<SubFileLoggerInfo> SubLoggers => _loggers.Values;
@@ -33,28 +31,27 @@ internal sealed class CompositeFileLogger : ILogger
     /// </summary>
     public string Category { get; }
 
-   
-    public void Update(string provider, LogLevel? minLogLevel, Func<string?, string?, LogLevel, bool>? filter) 
+    public void Update(string provider, LogLevel? minLogLevel, Func<string?, string?, LogLevel, bool>? filter)
     {
-        var updateBuilder = ImmutableDictionary.CreateBuilder<string, SubFileLoggerInfo>();
-
-        foreach (var l in _loggers) 
-        {
-            if (l.Key == provider)
+        // replace the entry in one atomic publish; publishing per iteration would expose a partially
+        // built dictionary to concurrent readers and drop messages for some sub providers
+        ImmutableInterlocked.Update(
+            ref _loggers,
+            static (current, state) =>
             {
-                var newVal = new SubFileLoggerInfo(l.Value.Logger, l.Value.SubProviderName, minLogLevel, filter);
-                updateBuilder.Add(provider, newVal);
-            }
-            else
-            {
-                updateBuilder.Add(l);
-            }
+                if (!current.TryGetValue(state.Provider, out var existing))
+                {
+                    return current;
+                }
 
-            Interlocked.Exchange(ref _loggers, updateBuilder.ToImmutable());
-        }
+                return current.SetItem(
+                    state.Provider,
+                    new SubFileLoggerInfo(existing.Logger, existing.SubProviderName, state.MinLevel, state.Filter));
+            },
+            (Provider: provider, MinLevel: minLogLevel, Filter: filter));
     }
 
-    internal IExternalScopeProvider? ScopeProvider 
+    internal IExternalScopeProvider? ScopeProvider
     {
         get => _scopeProvider;
         set
@@ -69,7 +66,7 @@ internal sealed class CompositeFileLogger : ILogger
 
     IDisposable ILogger.BeginScope<TState>(TState state)
     {
-        if (ScopeProvider == null) 
+        if (ScopeProvider == null)
         {
             return NullScope.Instance;
         }
@@ -77,11 +74,12 @@ internal sealed class CompositeFileLogger : ILogger
         return ScopeProvider.Push(state);
     }
 
-    public bool IsEnabled(LogLevel logLevel) => _loggers.Values.All(l => IsEnabled(l, logLevel));
+    // true when any sub logger accepts the level (mirrors Microsoft.Extensions.Logging.Logger.IsEnabled)
+    public bool IsEnabled(LogLevel logLevel) => _loggers.Values.Any(l => IsEnabled(l, logLevel));
 
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception, string> formatter)
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
     {
-        foreach (var logger in _loggers) 
+        foreach (var logger in _loggers)
         {
             if (IsEnabled(logger.Value, logLevel))
             {

@@ -1,54 +1,52 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Bleess.Extensions.Logging.File
 {
     // adapted from ConsoleLogger from https://github.com/dotnet/runtime
-    class FileLogger : ILogger
-    {   
+    internal sealed class FileLogger : ILogger
+    {
+        private const int InitialBufferSize = 1024;
+        private const int MaxRetainedBufferSize = 64 * 1024;
+
         private readonly string _name;
         private readonly FileLoggerProcessor _queueProcessor;
 
         internal FileLogger(string name, FileLoggerProcessor loggerProcessor)
         {
-            if (name == null)
-            {
-                throw new ArgumentNullException(nameof(name));
-            }
-
-            _name = name;
+            _name = name ?? throw new ArgumentNullException(nameof(name));
             _queueProcessor = loggerProcessor;
         }
 
-        internal FileFormatter Formatter { get; set; }
+        internal FileFormatter? Formatter { get; set; }
 
         /// fallback setting to include scopes, deprecated API for setting this on the log provider
         internal bool? FallbackIncludeScope { get; set; }
 
-        internal string SubProviderName { get; set; }
+        internal string? SubProviderName { get; set; }
 
-        internal IExternalScopeProvider ScopeProvider { get; set; }
+        internal IExternalScopeProvider? ScopeProvider { get; set; }
 
         [ThreadStatic]
-        private static StringWriter t_stringWriter;
+        private static StringWriter? t_stringWriter;
 
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             if (!IsEnabled(logLevel))
             {
                 return;
             }
-            if (formatter == null)
-            {
-                throw new ArgumentNullException(nameof(formatter));
-            }
+            ArgumentNullException.ThrowIfNull(formatter);
+
+            // the provider validates the formatter at startup, this is only a guard against a bad registration
+            var logFormatter = this.Formatter
+                ?? throw new InvalidOperationException($"No file formatter is configured for logger '{_name}'.");
+
             t_stringWriter ??= new StringWriter();
             LogEntry<TState> logEntry = new LogEntry<TState>(logLevel, _name, eventId, state, exception, formatter);
-            Formatter.Write(in logEntry, ScopeProvider, t_stringWriter, SubProviderName, FallbackIncludeScope);
+            logFormatter.Write(in logEntry, ScopeProvider, t_stringWriter, SubProviderName, FallbackIncludeScope);
 
             var sb = t_stringWriter.GetStringBuilder();
             if (sb.Length == 0)
@@ -57,20 +55,23 @@ namespace Bleess.Extensions.Logging.File
             }
             string computedAnsiString = sb.ToString();
             sb.Clear();
-            if (sb.Capacity > 1024)
+
+            // keep the buffer for the next message: shrinking it to the initial size on every entry
+            // re-allocates for messages larger than that. Only release it after a one-off large entry.
+            if (sb.Capacity > MaxRetainedBufferSize)
             {
-                sb.Capacity = 1024;
+                sb.Capacity = InitialBufferSize;
             }
-            var msg = new LogMessageEntry(computedAnsiString);
-            _queueProcessor.EnqueueMessage(ref msg);
+            _queueProcessor.EnqueueMessage(new LogMessageEntry(computedAnsiString));
         }
 
         public bool IsEnabled(LogLevel logLevel) => logLevel != LogLevel.None;
 
-        public IDisposable BeginScope<TState>(TState state) => ScopeProvider?.Push(state) ?? NullScope.Instance;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+            => ScopeProvider?.Push(state) ?? NullScope.Instance;
     }
 
-    internal class NullScope : IDisposable
+    internal sealed class NullScope : IDisposable
     {
         public static NullScope Instance { get; } = new NullScope();
 

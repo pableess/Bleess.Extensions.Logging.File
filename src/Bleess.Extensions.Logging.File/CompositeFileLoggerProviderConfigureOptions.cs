@@ -4,12 +4,7 @@ using Microsoft.Extensions.Logging.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Primitives;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.Versioning;
-using System.Text;
-using System.Threading.Tasks;
-using static System.Collections.Specialized.BitVector32;
+using System.Diagnostics.CodeAnalysis;
 
 #nullable enable
 
@@ -20,6 +15,7 @@ namespace Bleess.Extensions.Logging.File
         private readonly IConfiguration _configuration;
         private readonly string _name;
         private readonly Func<IConfiguration, IChangeToken> _getChangeToken;
+
         public CompositeOptionsChangeTokenSourceSourceBase(ILoggerProviderConfiguration<CompositeFileLoggerProvider> providerConfiguration, string name, Func<IConfiguration, IChangeToken> getToken)
         {
             _name = GetName(name);
@@ -29,7 +25,7 @@ namespace Bleess.Extensions.Logging.File
 
         protected static string GetName(string? name) => name ?? Options.DefaultName;
 
-        public string? Name => _name;
+        public string Name => _name;
 
         public IChangeToken GetChangeToken() => _getChangeToken(_configuration);
     }
@@ -50,7 +46,9 @@ namespace Bleess.Extensions.Logging.File
         }
     }
 
-    internal class CompositeFileLoggerProviderConfigureOptions : 
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Options are bound from configuration. This is the same reflection requirement as the built-in Microsoft.Extensions.Logging providers.")]
+    [UnconditionalSuppressMessage("Aot", "IL3050", Justification = "See IL2026: configuration binding requires reflection.")]
+    internal class CompositeFileLoggerProviderConfigureOptions :
         IConfigureNamedOptions<FileLoggerOptions>,
         IConfigureNamedOptions<CompositeLoggerFilterOptions>
     {
@@ -60,8 +58,6 @@ namespace Bleess.Extensions.Logging.File
         {
             _configuration = providerConfiguration.Configuration;
         }
-
-       
 
         public void Configure(FileLoggerOptions options)
         {
@@ -76,7 +72,7 @@ namespace Bleess.Extensions.Logging.File
                 var section = _configuration.GetSection(name);
                 section.Bind(options);
             }
-            else 
+            else
             {
                 Configure(options);
             }
@@ -88,7 +84,6 @@ namespace Bleess.Extensions.Logging.File
 
         public void Configure(string? name, CompositeLoggerFilterOptions options)
         {
-            // todo: parse and populate the options
             if (!string.IsNullOrEmpty(name))
             {
                 // find config section that represents the sub provider
@@ -102,7 +97,7 @@ namespace Bleess.Extensions.Logging.File
                     LoadRules(options, logLevelSection, logger);
                 }
             }
-            else 
+            else
             {
                 this.Configure(options);
             }
@@ -154,7 +149,7 @@ namespace Bleess.Extensions.Logging.File
                 LoadRules(options, logLevelSection, null);
             }
         }
-       
+
         #endregion
     }
 }
