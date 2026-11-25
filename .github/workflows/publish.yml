@@ -1,0 +1,140 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - '[0-9]*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version, for example 4.0.1 or 4.1.0-rc.1. Required unless the workflow runs from a tag.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  # Required for NuGet trusted publishing: lets the job request a GitHub OIDC token.
+  id-token: write
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # SourceLink needs the commit history to embed the right source links.
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [[ -n "${INPUT_VERSION:-}" ]]; then
+            raw="$INPUT_VERSION"
+          elif [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            raw="$GITHUB_REF_NAME"
+          else
+            echo "::error::A version input is required when the workflow is not started from a tag."
+            exit 1
+          fi
+
+          version="${raw#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::'$version' is not a valid SemVer package version."
+            exit 1
+          fi
+
+          prefix="${version%%-*}"
+          suffix=""
+          if [[ "$version" == *-* ]]; then
+            suffix="${version#*-}"
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+          echo "suffix=$suffix" >> "$GITHUB_OUTPUT"
+          echo "Publishing version $version"
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+            11.0.x
+
+      - name: Restore
+        run: dotnet restore Bleess.Extensions.Logging.File.slnx
+
+      - name: Build
+        run: >
+          dotnet build Bleess.Extensions.Logging.File.slnx -c Release --no-restore
+          -p:VersionPrefix=${{ steps.version.outputs.prefix }}
+          -p:VersionSuffix=${{ steps.version.outputs.suffix }}
+
+      - name: Test
+        run: dotnet test tests/Tests.csproj -c Release --no-build
+
+      - name: Pack
+        run: >
+          dotnet pack src/Bleess.Extensions.Logging.File/Bleess.Extensions.Logging.File.csproj
+          -c Release --no-build -o artifacts
+          -p:VersionPrefix=${{ steps.version.outputs.prefix }}
+          -p:VersionSuffix=${{ steps.version.outputs.suffix }}
+
+      - name: Verify package
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          package="artifacts/Bleess.Extensions.Logging.File.${VERSION}.nupkg"
+          if [[ ! -f "$package" ]]; then
+            echo "::error::Expected package '$package' was not produced."
+            ls -l artifacts
+            exit 1
+          fi
+          echo "Created $package"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nuget-${{ steps.version.outputs.version }}
+          path: artifacts/*.nupkg
+          if-no-files-found: error
+
+      - name: NuGet login (OIDC exchange for a short-lived API key)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          # nuget.org profile name, not an email address.
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to nuget.org
+        shell: bash
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${NUGET_API_KEY:-}" ]]; then
+            echo "::error::NuGet login did not return an API key. Check the trusted publishing policy and the NUGET_USER secret."
+            exit 1
+          fi
+
+          dotnet nuget push "artifacts/Bleess.Extensions.Logging.File.${VERSION}.nupkg" \
+            --api-key "$NUGET_API_KEY" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
