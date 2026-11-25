@@ -155,6 +155,34 @@ namespace Tests
         }
 
         [TestMethod]
+        public void JsonFormatter_WritesMessagesLargerThanTheInitialBuffer()
+        {
+            // regression test: the JSON formatter used a fixed size buffer and threw for entries > 1 KB
+            using var dir = TestDirectory.Create();
+            string path = dir.File("large.json");
+            string payload = new string('x', 16 * 1024);
+
+            var services = new ServiceCollection();
+            services.AddLogging(b => b.AddJsonFile(o => o.Path = path));
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger("json.large");
+                logger.LogInformation("payload {payload}", payload);
+                logger.LogError(new InvalidOperationException("boom" + new string('y', 4096)), "boom");
+            }
+
+            var lines = File.ReadAllLines(path).Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+            Assert.AreEqual(2, lines.Length);
+
+            using var first = JsonDocument.Parse(lines[0]);
+            Assert.AreEqual("payload " + payload, first.RootElement.GetProperty("Message").GetString());
+
+            using var second = JsonDocument.Parse(lines[1]);
+            StringAssert.Contains(second.RootElement.GetProperty("Exception").GetString(), "boom");
+        }
+
+        [TestMethod]
         public void SimpleFormatter_SingleLineReplacesNewLines()
         {
             using var dir = TestDirectory.Create();

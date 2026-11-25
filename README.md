@@ -272,11 +272,28 @@ The queue holds 1024 messages. When it is full, `Log` blocks until there is room
 
 ## Benchmarks
 
-Measured with BenchmarkDotNet against NReco.Logging.File and Karambolo.Extensions.Logging.File. The numbers below were produced on a shared Linux VM running .NET 10, so use them as a relative comparison and re-run them on your own hardware:
+The suite compares `Bleess.Extensions.Logging.File` with `Karambolo.Extensions.Logging.File` 4.1.1 and `NReco.Logging.File` 1.4.0. It measures four different things, because "logging performance" is not one number:
+
+- **producer cost**: the time `Log()` takes on the calling thread (format + enqueue). This is the latency the application pays.
+- **end to end**: a batch of messages plus flush and close, including the write thread and the file I/O.
+- **contention, multi-file, rolling and startup**: the features that make the provider different.
+- **allocations**: managed bytes allocated per operation.
+
+All libraries are configured identically: same message and arguments, scopes disabled, and a `MessageOnly` output profile (each library is configured to write just the formatted message). A `--parity` mode verifies that the work is the same by comparing bytes written per message:
+
+```
+MessageOnly  Bleess           67.0 B/msg
+MessageOnly  Karambolo        67.0 B/msg
+MessageOnly  NReco            67.0 B/msg
+```
+
+Full tables (mean, error, stddev, GC and allocations for all 68 cases) are in [benchmark/RESULTS.md](benchmark/RESULTS.md); the methodology and the non-normalizable differences between the libraries are in [benchmark/README.md](benchmark/README.md).
+
+Measured with BenchmarkDotNet v0.15.8 on a shared Linux VM, so treat the absolute numbers as machine specific and compare the ratios within one run:
 
 ```
 BenchmarkDotNet v0.15.8, Linux Fedora Linux 44 (COSMIC)
-AMD Ryzen 5 5600H with Radeon Graphics 3.15GHz, 1 CPU, 12 logical and 6 physical cores
+AMD Ryzen 5 5600H with Radeon Graphics 1.11GHz, 1 CPU, 12 logical and 6 physical cores
 .NET SDK 11.0.100-rc.3.26522.148
   [Host]     : .NET 10.0.13 (10.0.13, 10.0.1326.50504), X64 RyuJIT x86-64-v3
   Job-BJZBKM : .NET 10.0.13 (10.0.13, 10.0.1326.50504), X64 RyuJIT x86-64-v3
@@ -284,32 +301,84 @@ AMD Ryzen 5 5600H with Radeon Graphics 3.15GHz, 1 CPU, 12 logical and 6 physical
 IterationCount=10  LaunchCount=2  WarmupCount=10
 ```
 
-### Simple text message
+### Producer cost (per `Log()` call)
 
-| Method                 | Mean          | Error       | StdDev      | Gen0     | Allocated |
-|----------------------- |--------------:|------------:|------------:|---------:|----------:|
-| Bleess_single_write    |      2.063 μs |   0.0265 μs |   0.0294 μs |   0.0801 |     672 B |
-| Karambolo_single_write |      1.920 μs |   0.0122 μs |   0.0136 μs |   0.0858 |     730 B |
-| NReco_single_write     |      1.857 μs |   0.0192 μs |   0.0205 μs |   0.0610 |     512 B |
-| Bleess_10000_writes    | 20,529.518 μs | 199.5452 μs | 213.5111 μs | 781.2500 | 6720000 B |
-| Karambolo_10000_write  | 19,412.875 μs | 174.6977 μs | 194.1761 μs | 906.2500 | 7630468 B |
-| NReco_10000_write      | 18,421.412 μs | 184.9538 μs | 205.5756 μs | 593.7500 | 5120254 B |
+| Library | 66 B | 1 KB | 16 KB | Exception | Allocated (66 B) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| **Bleess** | **370 ns** | **1.27 µs** | 28.1 µs | **364 ns** | **416 B** |
+| NReco | 900 ns | 2.47 µs | 26.7 µs | 887 ns | 458 B |
+| Karambolo | 2.00 µs | 3.63 µs | 10.1 µs \* | 1.99 µs | 1.14 KB |
 
-### JSON file
+`Log()` costs about 2.4x less than NReco and 5.4x less than Karambolo for a typical message, and allocates the least. For 16 KB messages the producer is bound by the write thread: Bleess and NReco apply backpressure (the caller waits), while Karambolo discards entries once its 1024 entry queue is full (\*), so its number reflects doing less work.
 
-| Method                      | Mean     | Error     | StdDev    | Gen0   | Gen1   | Allocated |
-|---------------------------- |---------:|----------:|----------:|-------:|-------:|----------:|
-| Bleess_single_write_json    | 3.376 μs | 0.0494 μs | 0.0569 μs | 0.7515 | 0.0191 |   6.14 KB |
-| Karambolo_single_write_json | 3.007 μs | 0.0238 μs | 0.0264 μs | 0.3052 | 0.2136 |   2.56 KB |
+### End to end (500 messages, flush and close included)
 
-### Multiple files
+| Library | 66 B | 1 KB | 16 KB | Allocated (66 B) |
+| --- | ---: | ---: | ---: | ---: |
+| **Bleess** | **547 µs** | 1.75 ms | 10.14 ms | 212 KB |
+| NReco | 686 µs | **1.36 ms** | **9.77 ms** | 149 KB |
+| Karambolo | 2.07 ms | 3.31 ms | 17.69 ms | 578 KB |
 
-| Method                           | Mean     | Error     | StdDev    | Gen0   | Gen1   | Allocated |
-|--------------------------------- |---------:|----------:|----------:|-------:|-------:|----------:|
-| Bleess_multifile_single_write    | 4.358 μs | 0.0764 μs | 0.0849 μs | 0.1450 |      - |   1.22 KB |
-| Karambolo_multifile_single_write | 4.007 μs | 0.0223 μs | 0.0247 μs | 0.1678 | 0.1144 |    1.4 KB |
+OS buffered flush (the default). Durable writes (`FlushToDisk = true`) are a separate benchmark; on tmpfs there is no measurable difference, so run it with `BENCHMARK_LOG_ROOT` on a real filesystem to size the fsync cost.
 
-Allocation per operation is lower than in the 3.x measurements (744 B → 672 B for a text message, 7.99 KB → 6.14 KB for a JSON message) because the JSON formatter no longer copies through `MemoryStream.ToArray()` and an intermediate string, and `WriteCountingFileStream` implements the span based write overload.
+### Multi-file scaling (per call)
+
+| Library | 1 file | 2 files | 4 files | Allocated (4 files) |
+| --- | ---: | ---: | ---: | ---: |
+| **Bleess** | **362 ns** | **802 ns** | 1.92 µs | 1.34 KB |
+| NReco | 886 ns | 982 ns | **1.32 µs** | 736 B |
+| Karambolo | 1.98 µs | 2.23 µs | 3.40 µs | 4.65 KB |
+
+Bleess is fastest for one and two files. At four files NReco is slightly faster because its per-provider path is cheaper, while the Bleess composite provider formats the message once per destination file and keeps a writer thread per file.
+
+### Contention (2,000 messages per producer, 66 B)
+
+| Library | 1 producer | 4 producers | 8 producers |
+| --- | ---: | ---: | ---: |
+| **Bleess** | **926 µs** | **4.30 ms** | 12.46 ms |
+| NReco | 1.84 ms | 10.73 ms | 21.87 ms |
+| Karambolo | 4.27 ms | 5.20 ms | **6.73 ms** \* |
+
+Karambolo scales best at 8 producers because it drops entries instead of applying backpressure (\*). Bleess is faster than NReco at every producer count.
+
+### Rolling (5,000 messages, 64 KB files, 4 files retained)
+
+| Library | Mean | Allocated |
+| --- | ---: | ---: |
+| **Bleess** | **4.43 ms** | 2.17 MB |
+| NReco | 5.31 ms | 2.01 MB |
+| Karambolo | 18.76 ms | 4.87 MB |
+
+### JSON
+
+| Library | 66 B | 1 KB | 16 KB | Allocated (66 B) |
+| --- | ---: | ---: | ---: | ---: |
+| **Bleess** | **3.00 µs** | **4.23 µs** | 55.9 µs | **1.5 KB** |
+| Karambolo | 3.15 µs | 7.02 µs | 42.1 µs \* | 2.25 KB |
+
+The JSON formatter writes through a pooled growable buffer and no longer allocates an intermediate string or copies through `MemoryStream.ToArray()`.
+
+\* Karambolo discards entries when its queue is full; Bleess and NReco apply backpressure.
+
+### Startup
+
+Provider creation with existing files in the log directory (Bleess scans the directory to align the rolling sequence number):
+
+| Existing files | Mean | Allocated |
+| --- | ---: | ---: |
+| 0 | 343 µs | 85 KB |
+| 100 | 556 µs | 124 KB |
+| 1,000 | 2.30 ms | 463 KB |
+
+The scan is linear in the number of files that match the log file prefix; keep the log directory dedicated to the application.
+
+### Reproducing
+
+```
+dotnet run -c Release --project benchmark/Benchmarks                  # full suite, ~27 minutes
+dotnet run -c Release --project benchmark/Benchmarks -- --filter '*Json*'
+dotnet run -c Release --project benchmark/Benchmarks -- --parity      # byte parity report
+```
 
 ## Upgrading from 3.x
 

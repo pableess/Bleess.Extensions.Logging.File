@@ -19,8 +19,12 @@ Tests run on all three target frameworks. They use the internal `TestTimeProvide
 ## Benchmarks
 
 ```
-dotnet run -c Release --project benchmark/Benchmarks -- --filter '*'
+dotnet run -c Release --project benchmark/Benchmarks                  # full suite
+dotnet run -c Release --project benchmark/Benchmarks -- --filter '*Json*'
+dotnet run -c Release --project benchmark/Benchmarks -- --parity      # byte parity report
 ```
+
+See `benchmark/README.md` for what each benchmark measures and the known configuration differences between the compared libraries. Do not compare numbers across machines; compare ratios within one run.
 
 ## Conventions
 

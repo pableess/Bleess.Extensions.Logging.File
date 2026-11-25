@@ -5,6 +5,8 @@
     <File Path="CONTRIBUTING.md" />
     <File Path="Directory.Packages.props" />
     <File Path="README.md" />
+    <File Path="benchmark/README.md" />
+    <File Path="benchmark/RESULTS.md" />
   </Folder>
   <Project Path="benchmark/Benchmarks/Benchmarks.csproj" />
   <Project Path="samples/Sample/Sample.csproj" />

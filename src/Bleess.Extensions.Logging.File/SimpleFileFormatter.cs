@@ -61,7 +61,8 @@ internal sealed class SimpleFileFormatter : FileFormatter<SimpleFileFormatterOpt
         }
         if (logLevelString != null)
         {
-            textWriter.Write($" {logLevelString}");
+            textWriter.Write(' ');
+            textWriter.Write(logLevelString);
         }
         CreateDefaultLogMessage(textWriter, logEntry, message, scopeProvider, formatterOptions, includeScopes);
     }

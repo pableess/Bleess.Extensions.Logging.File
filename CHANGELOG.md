@@ -24,7 +24,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Tests for reload, option validation, JSON output, composite filters, custom formatter selection, rolling limits and UTC/local file naming; tests now run on all three target frameworks.
 - CI workflow that builds, tests and packs the solution.
 - `.editorconfig`, `CHANGELOG.md` and `CONTRIBUTING.md`.
-- The benchmark harness accepts BenchmarkDotNet arguments (for example `--filter '*Json*'`), and the benchmarks were re-run on .NET 10 with updated results in the README.
+- The benchmark suite was rewritten around a parity-verified harness: producer cost, end to end throughput, rolling, durable writes, contention, multi-file scaling, startup and a no-op baseline, compared with Karambolo.Extensions.Logging.File 4.1.1 and NReco.Logging.File 1.4.0. It accepts BenchmarkDotNet arguments (for example `--filter '*Json*'`) and has a `--parity` mode that reports bytes per message. See `benchmark/README.md`.
 
 ### Fixed
 
@@ -38,7 +38,8 @@ All notable changes to this project are documented here. The format follows [Kee
 - `RemoveExtraFiles` could delete the file currently being written when `MaxNumberFiles` was 0; the current file is now always skipped.
 - `RollingFileInfo.AlignToDirectory` treated files without an extension as having one, and file masks were inconsistent for extensionless paths.
 - `WriteCountingFileStream` now overrides `Write(ReadOnlySpan<byte>)`, avoiding an `ArrayPool` rent and copy on every `StreamWriter` flush.
-- The JSON formatter no longer calls `MemoryStream.ToArray()` or allocates an intermediate string per message.
+- The JSON formatter no longer calls `MemoryStream.ToArray()` or allocates an intermediate string per message, and it now writes through a pooled growable buffer. Previously an entry larger than the 1 KB buffer threw `NotSupportedException` ("Memory stream is not expandable").
+- The thread static formatting buffer is no longer shrunk after every message, which removes a per-message allocation for messages larger than 1 KB (large messages allocated roughly twice as much as necessary).
 - `FileLoggerOptions.IncludeScopes`/formatter `IncludeScopes` fallback no longer mutates the shared options instance.
 
 ## [3.0.1]

@@ -8,6 +8,9 @@ namespace Bleess.Extensions.Logging.File
     // adapted from ConsoleLogger from https://github.com/dotnet/runtime
     internal sealed class FileLogger : ILogger
     {
+        private const int InitialBufferSize = 1024;
+        private const int MaxRetainedBufferSize = 64 * 1024;
+
         private readonly string _name;
         private readonly FileLoggerProcessor _queueProcessor;
 
@@ -52,9 +55,12 @@ namespace Bleess.Extensions.Logging.File
             }
             string computedAnsiString = sb.ToString();
             sb.Clear();
-            if (sb.Capacity > 1024)
+
+            // keep the buffer for the next message: shrinking it to the initial size on every entry
+            // re-allocates for messages larger than that. Only release it after a one-off large entry.
+            if (sb.Capacity > MaxRetainedBufferSize)
             {
-                sb.Capacity = 1024;
+                sb.Capacity = InitialBufferSize;
             }
             _queueProcessor.EnqueueMessage(new LogMessageEntry(computedAnsiString));
         }

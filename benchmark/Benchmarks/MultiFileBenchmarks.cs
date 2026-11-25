@@ -1,82 +1,50 @@
-﻿extern alias Bleess;
-
 using BenchmarkDotNet.Attributes;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
+namespace Benchmarks;
 
-// alias ns
-using Bleess::Microsoft.Extensions.Logging;
-
-
-namespace Benchmarks
+/// <summary>
+/// Cost of writing the same event to several files. Bleess uses one composite provider with one
+/// writer thread per file, Karambolo uses one provider with several files, NReco needs one provider
+/// per file.
+/// </summary>
+[SimpleJob(2, 10, 10)]
+public class MultiFileBenchmarks
 {
-    [MemoryDiagnoser()]
-    [SimpleJob(2, 10, 10)]
-    public partial class MultiFileBenchmarks
+    [Params(1, 2, 4)]
+    public int FileCount { get; set; }
+
+    private MessageSet _messages = null!;
+    private TempDirectory _directory = null!;
+    private LoggingTarget _bleess = null!;
+    private LoggingTarget _karambolo = null!;
+    private LoggingTarget _nReco = null!;
+
+    [GlobalSetup]
+    public void Setup()
     {
-        public MultiFileBenchmarks()
-        {
-            this.SetupBleessLogging();
-            this.SetupKaramboloLogging();
-        }
+        _messages = MessageSet.Create(MessageShape.Small);
+        _directory = new TempDirectory();
 
-        // specific benchmarks for bleess logging
-
-        private Microsoft.Extensions.Logging.ILogger? _bleessLogger;
-        public void SetupBleessLogging()
-        {
-            ServiceCollection sc = new ServiceCollection();
-            sc.AddLogging(logBuilder =>
-            {
-                // file 1
-                logBuilder.AddFiles(m => 
-                {
-                    m.AddFile("File1", o => 
-                    {
-                        o.Path = "logs/Bleess1.txt";
-                        o.MaxFileSizeInMB = 1024 * 1024; // 1 GB
-                        o.MaxNumberFiles = 31;
-                    }).WithSimpleFormatter(o =>
-                    {
-                        o.SingleLine = true;
-                        o.EmptyLineBetweenMessages = true;
-                        o.IncludeScopes = false;
-                        o.UseUtcTimestamp = true;
-                    });
-              
-                    // file 2 
-                    m.AddFile("File2", o => 
-                    {
-                        o.Path = "logs/Bleess2.txt";
-                        o.MaxFileSizeInMB = 1024 * 1024; // 1 GB
-                        o.MaxNumberFiles = 31;
-                    }).WithSimpleFormatter(o => 
-                    {
-                        o.SingleLine = true;
-                        o.EmptyLineBetweenMessages = true;
-                        o.IncludeScopes = false;
-                        o.UseUtcTimestamp = true;
-                    });
-                });
-            });
-
-            var sp = sc.BuildServiceProvider();
-
-            _bleessLogger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILoggerFactory>().CreateLogger("default");
-        }
-
-
-        [Benchmark]
-        [BenchmarkCategory("multifile")]
-        public void Bleess_multifile_single_write()
-        {
-            _bleessLogger!.LogError("This is a test message with some parameters {a}, {b}, {c}", 100, "some string", true);
-        }
+        _bleess = TargetFactory.Create(Library.Bleess, TargetFactory.Options(_directory, "bleess.log", LogFormat.MessageOnly, fileCount: FileCount));
+        _karambolo = TargetFactory.Create(Library.Karambolo, TargetFactory.Options(_directory, "karambolo.log", LogFormat.MessageOnly, fileCount: FileCount));
+        _nReco = TargetFactory.Create(Library.NReco, TargetFactory.Options(_directory, "nreco.log", LogFormat.MessageOnly, fileCount: FileCount));
     }
+
+    [GlobalCleanup]
+    public void Cleanup()
+    {
+        _bleess.Dispose();
+        _karambolo.Dispose();
+        _nReco.Dispose();
+        _directory.Dispose();
+    }
+
+    [Benchmark(Baseline = true)]
+    public void Bleess_multifile_single_write() => _messages.Write(_bleess.Logger);
+
+    [Benchmark]
+    public void Karambolo_multifile_single_write() => _messages.Write(_karambolo.Logger);
+
+    [Benchmark]
+    public void NReco_multifile_single_write() => _messages.Write(_nReco.Logger);
 }
