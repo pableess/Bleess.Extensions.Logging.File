@@ -183,6 +183,39 @@ namespace Tests
         }
 
         [TestMethod]
+        public void SimpleFormatter_MatchesTheConsoleFormatterShape()
+        {
+            // the simple formatter is modeled on the console formatter; pin the exact prefix so
+            // changes to padding or the timestamp separator are caught
+            using var dir = TestDirectory.Create();
+            string path = dir.File("shape.txt");
+            var clock = new TestTimeProvider(new DateTimeOffset(2024, 1, 15, 10, 30, 0, TimeSpan.Zero));
+
+            var services = new ServiceCollection();
+            services.AddSingleton<TimeProvider>(clock);
+            services.AddLogging(b => b.AddSimpleFile(
+                o => o.Path = path,
+                o =>
+                {
+                    o.TimestampFormat = "yyyy-MM-dd HH:mm:ss";
+                    o.UseUtcTimestamp = true;
+                    o.InvariantTimestampFormat = true;
+                    o.EmptyLineBetweenMessages = false;
+                }));
+
+            using (var provider = services.BuildServiceProvider())
+            {
+                var logger = provider.GetRequiredService<ILoggerFactory>().CreateLogger("golden.test");
+                logger.Log(LogLevel.Information, new EventId(42), "hello", null, (s, e) => s);
+            }
+
+            var lines = File.ReadAllLines(path);
+            Assert.AreEqual(2, lines.Length);
+            Assert.AreEqual("2024-01-15 10:30:00  info: golden.test [42]", lines[0]);
+            Assert.AreEqual("      hello", lines[1]);
+        }
+
+        [TestMethod]
         public void SimpleFormatter_SingleLineReplacesNewLines()
         {
             using var dir = TestDirectory.Create();

@@ -106,7 +106,10 @@ namespace Bleess.Extensions.Logging.File
 
         private void OpenAndAlignFile()
         {
-            if (this.fileSizeLimitBytes > 0)
+            // a non-appending writer starts a fresh file at the base name. Continuing the sequence
+            // from a previous run would truncate the newest old file for no benefit, and would make
+            // Append=false mean different things depending on whether size rolling is enabled.
+            if (this.append && this.fileSizeLimitBytes > 0)
             {
                 // update current log sequence number to last one
                 this.rollingFileInfo.AlignToDirectory();

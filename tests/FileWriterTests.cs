@@ -118,5 +118,60 @@ namespace Tests
             var files = Directory.GetFiles(dir.Path, "multi*");
             Assert.AreEqual(10, files.Length, "Size based rolling should have created the maximum number of files.");
         }
+
+        [TestMethod]
+        [DataRow(0L)]
+        [DataRow(1024L)]
+        public void AppendFalse_StartsAtTheBaseFileAndTruncatesIt(long sizeLimitBytes)
+        {
+            // regression test: startup used to align to the newest sequence, so Append=false truncated
+            // the newest old file and created a new sequence depending on whether size rolling was on
+            using var dir = TestDirectory.Create();
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+
+            WriteFile(dir.File("app.txt"), "old base", now.AddMinutes(-2));
+            WriteFile(dir.File("app_001.txt"), "old first sequence", now.AddMinutes(-1));
+            WriteFile(dir.File("app_002.txt"), "old newest sequence", now);
+
+            using (FileWriter w = new FileWriter(dir.File("app.txt"), sizeLimitBytes, 3, false, RollingInterval.Infinite, false, false, TimeProvider.System))
+            {
+                w.WriteMessage("new message", true);
+                w.Close();
+            }
+
+            Assert.AreEqual("new message" + Environment.NewLine, File.ReadAllText(dir.File("app.txt")));
+            Assert.AreEqual("old first sequence", File.ReadAllText(dir.File("app_001.txt")));
+            Assert.AreEqual("old newest sequence", File.ReadAllText(dir.File("app_002.txt")));
+        }
+
+        [TestMethod]
+        public void AppendTrue_AlignsToTheNewestSequenceAndAppends()
+        {
+            using var dir = TestDirectory.Create();
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+
+            WriteFile(dir.File("app.txt"), "old base", now.AddMinutes(-2));
+            WriteFile(dir.File("app_001.txt"), "old first sequence", now.AddMinutes(-1));
+            WriteFile(dir.File("app_002.txt"), "old newest sequence" + Environment.NewLine, now);
+
+            using (FileWriter w = new FileWriter(dir.File("app.txt"), 1024, 3, true, RollingInterval.Infinite, false, false, TimeProvider.System))
+            {
+                w.WriteMessage("new message", true);
+                w.Close();
+            }
+
+            Assert.AreEqual(3, Directory.GetFiles(dir.Path, "app*").Length);
+            Assert.AreEqual("old base", File.ReadAllText(dir.File("app.txt")));
+            Assert.AreEqual("old first sequence", File.ReadAllText(dir.File("app_001.txt")));
+            Assert.AreEqual(
+                "old newest sequence" + Environment.NewLine + "new message" + Environment.NewLine,
+                File.ReadAllText(dir.File("app_002.txt")));
+        }
+
+        private static void WriteFile(string path, string content, DateTimeOffset lastWrite)
+        {
+            File.WriteAllText(path, content);
+            File.SetLastWriteTimeUtc(path, lastWrite.UtcDateTime);
+        }
     }
 }

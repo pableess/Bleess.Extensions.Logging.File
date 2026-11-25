@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- `Append = false` now starts a new file at the base name and truncates it instead of aligning to the newest existing sequence and truncating that file. The behavior no longer depends on whether size based rolling is enabled, and previously rolled files are left in place.
+
 ## [4.0.0] - 2026-11-24
 
 ### Changed

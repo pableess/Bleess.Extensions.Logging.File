@@ -85,7 +85,7 @@ The provider reads the `Logging:File` section. The values below are the defaults
 | `MaxNumberFiles` | Total number of files to keep, **including the file currently being written**. Must be at least 1. |
 | `MaxFileSizeInMB` | Roll when the current file exceeds this size. `0` disables size based rolling. Fractions are allowed. |
 | `FormatterName` | `simple` (default), `json`, or the name of a custom formatter. |
-| `Append` | `true` appends to an existing file, `false` truncates it when the application starts. |
+| `Append` | `true` appends to the current file and, when size rolling is enabled, continues from the newest sequence. `false` starts a new file at the base name and truncates it; previously rolled files are left in place. |
 | `FlushToDisk` | Also flushes the OS file buffers (`fsync` on Linux). Slower, but survives a machine crash. |
 | `MaxFlushInterval` | Maximum time in milliseconds between flushes when the queue never drains. `null` (default) or a negative value disables interval based flushing, `0` flushes after every message. |
 | `UseUtcTimestamp` | Use UTC for the date portion of the rolling file name. Defaults to local time. |
@@ -110,6 +110,7 @@ Files roll when either the configured date interval changes or the current file 
 - Size rolling appends a sequence number: `log.txt`, `log_001.txt`, `log_002.txt`, and so on. Once `MaxNumberFiles` files exist the oldest file is overwritten.
 - Date rolling appends the interval to the name, and the sequence number is kept: `log_20240115_003.txt`.
 - Files are enumerated and cleaned up by name prefix, so use a dedicated directory (or a unique prefix) for each application.
+- `Append = true` continues the newest existing sequence (for example `log_002.txt`) on startup. `Append = false` starts again at `log.txt`.
 - With `RollInterval = Infinite` and `MaxNumberFiles = 1`, the log file is reused and truncated each time it reaches the size limit.
 
 ## Formatting
