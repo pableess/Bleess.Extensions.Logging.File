@@ -24,6 +24,7 @@ All notable changes to this project are documented here. The format follows [Kee
 - Tests for reload, option validation, JSON output, composite filters, custom formatter selection, rolling limits and UTC/local file naming; tests now run on all three target frameworks.
 - CI workflow that builds, tests and packs the solution.
 - `.editorconfig`, `CHANGELOG.md` and `CONTRIBUTING.md`.
+- The benchmark harness accepts BenchmarkDotNet arguments (for example `--filter '*Json*'`), and the benchmarks were re-run on .NET 10 with updated results in the README.
 
 ### Fixed
 

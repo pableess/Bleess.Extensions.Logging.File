@@ -272,38 +272,44 @@ The queue holds 1024 messages. When it is full, `Log` blocks until there is room
 
 ## Benchmarks
 
-Measured with BenchmarkDotNet against NReco.Logging.File and Karambolo.Extensions.Logging.File. The numbers below were produced on .NET 8.0.11 (see `benchmark/Benchmarks`); re-run them locally for your hardware.
-
-### Simple text message
+Measured with BenchmarkDotNet against NReco.Logging.File and Karambolo.Extensions.Logging.File. The numbers below were produced on a shared Linux VM running .NET 10, so use them as a relative comparison and re-run them on your own hardware:
 
 ```
-BenchmarkDotNet v0.14.0, Windows 11 (10.0.26100.2605)
-AMD Ryzen 5 5600H with Radeon Graphics, 1 CPU, 12 logical and 6 physical cores
+BenchmarkDotNet v0.15.8, Linux Fedora Linux 44 (COSMIC)
+AMD Ryzen 5 5600H with Radeon Graphics 3.15GHz, 1 CPU, 12 logical and 6 physical cores
+.NET SDK 11.0.100-rc.3.26522.148
+  [Host]     : .NET 10.0.13 (10.0.13, 10.0.1326.50504), X64 RyuJIT x86-64-v3
+  Job-BJZBKM : .NET 10.0.13 (10.0.13, 10.0.1326.50504), X64 RyuJIT x86-64-v3
+
 IterationCount=10  LaunchCount=2  WarmupCount=10
 ```
 
-| Method                 | Mean            | Gen0     | Allocated |
-|----------------------- |----------------:|---------:|----------:|
-| Bleess_single_write    |        594.1 ns |   0.0877 |     744 B |
-| Karambolo_single_write |        541.3 ns |   0.0839 |     707 B |
-| NReco_single_write     |      2,199.3 ns |   0.0839 |     718 B |
-| Bleess_10000_writes    |  7,285,301.5 ns | 875.0000 | 7440023 B |
-| Karambolo_10000_write  |  8,466,456.8 ns | 843.7500 | 7067165 B |
-| NReco_10000_write      | 20,273,803.3 ns | 843.7500 | 7165933 B |
+### Simple text message
+
+| Method                 | Mean          | Error       | StdDev      | Gen0     | Allocated |
+|----------------------- |--------------:|------------:|------------:|---------:|----------:|
+| Bleess_single_write    |      2.063 μs |   0.0265 μs |   0.0294 μs |   0.0801 |     672 B |
+| Karambolo_single_write |      1.920 μs |   0.0122 μs |   0.0136 μs |   0.0858 |     730 B |
+| NReco_single_write     |      1.857 μs |   0.0192 μs |   0.0205 μs |   0.0610 |     512 B |
+| Bleess_10000_writes    | 20,529.518 μs | 199.5452 μs | 213.5111 μs | 781.2500 | 6720000 B |
+| Karambolo_10000_write  | 19,412.875 μs | 174.6977 μs | 194.1761 μs | 906.2500 | 7630468 B |
+| NReco_10000_write      | 18,421.412 μs | 184.9538 μs | 205.5756 μs | 593.7500 | 5120254 B |
 
 ### JSON file
 
-| Method                      | Mean     | Gen0   | Allocated |
-|---------------------------- |---------:|-------:|----------:|
-| Bleess_single_write_json    | 1.950 us | 0.9766 |   7.99 KB |
-| Karambolo_single_write_json | 1.717 us | 0.3204 |   2.64 KB |
+| Method                      | Mean     | Error     | StdDev    | Gen0   | Gen1   | Allocated |
+|---------------------------- |---------:|----------:|----------:|-------:|-------:|----------:|
+| Bleess_single_write_json    | 3.376 μs | 0.0494 μs | 0.0569 μs | 0.7515 | 0.0191 |   6.14 KB |
+| Karambolo_single_write_json | 3.007 μs | 0.0238 μs | 0.0264 μs | 0.3052 | 0.2136 |   2.56 KB |
 
 ### Multiple files
 
-| Method                           | Mean     | Allocated |
-|--------------------------------- |---------:|----------:|
-| Bleess_multifile_single_write    | 1.249 us |   1.36 KB |
-| Karambolo_multifile_single_write | 1.281 us |   1.31 KB |
+| Method                           | Mean     | Error     | StdDev    | Gen0   | Gen1   | Allocated |
+|--------------------------------- |---------:|----------:|----------:|-------:|-------:|----------:|
+| Bleess_multifile_single_write    | 4.358 μs | 0.0764 μs | 0.0849 μs | 0.1450 |      - |   1.22 KB |
+| Karambolo_multifile_single_write | 4.007 μs | 0.0223 μs | 0.0247 μs | 0.1678 | 0.1144 |    1.4 KB |
+
+Allocation per operation is lower than in the 3.x measurements (744 B → 672 B for a text message, 7.99 KB → 6.14 KB for a JSON message) because the JSON formatter no longer copies through `MemoryStream.ToArray()` and an intermediate string, and `WriteCountingFileStream` implements the span based write overload.
 
 ## Upgrading from 3.x
 
