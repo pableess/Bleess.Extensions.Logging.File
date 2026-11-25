@@ -1,12 +1,9 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Text;
-using System.Xml.Linq;
 
 #nullable enable
 
@@ -15,22 +12,39 @@ namespace Bleess.Extensions.Logging.File;
 /// <summary>
 /// Base class for a file formatter, withot any formatting options
 /// </summary>
-public abstract class FileFormatter 
+public abstract class FileFormatter
 {
     /// <summary>
     /// Base constructor for <see cref="FileFormatter"/>
     /// </summary>
     /// <param name="formatterName"></param>
     /// <exception cref="ArgumentNullException"></exception>
-    public FileFormatter(string formatterName)
+    protected FileFormatter(string formatterName)
+        : this(formatterName, null)
+    {
+    }
+
+    /// <summary>
+    /// Base constructor for <see cref="FileFormatter"/>
+    /// </summary>
+    /// <param name="formatterName">The name used to select this formatter in the logger options.</param>
+    /// <param name="timeProvider">The clock used for timestamps. Defaults to <see cref="TimeProvider.System"/>.</param>
+    /// <exception cref="ArgumentNullException"></exception>
+    protected FileFormatter(string formatterName, TimeProvider? timeProvider)
     {
         Name = formatterName ?? throw new ArgumentNullException(nameof(formatterName));
+        TimeProvider = timeProvider ?? TimeProvider.System;
     }
 
     /// <summary>
     /// Gets the name associated with the console log formatter.
     /// </summary>
     public string Name { get; }
+
+    /// <summary>
+    /// Gets the clock used to create timestamps for log entries.
+    /// </summary>
+    protected TimeProvider TimeProvider { get; }
 
     /// <summary>
     /// Writes the log message to the specified TextWriter.
@@ -44,21 +58,21 @@ public abstract class FileFormatter
     /// <param name="subProviderName">The name of the sub provider</param>
     /// <param name="fallbackIncludeScopes">fallback value for including the scopes</param>
     /// <typeparam name="TState">The type of the object to be written.</typeparam>
-    public abstract void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider scopeProvider, TextWriter textWriter, string? subProviderName = null, bool? fallbackIncludeScopes = null);
+    public abstract void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider? scopeProvider, TextWriter textWriter, string? subProviderName = null, bool? fallbackIncludeScopes = null);
 
 }
 
 /// <summary>
 /// Base class for file formatter with options
 /// </summary>
-public abstract class FileFormatter<TOptions> : FileFormatter, IDisposable
+public abstract class FileFormatter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicParameterlessConstructor | DynamicallyAccessedMemberTypes.PublicProperties)] TOptions> : FileFormatter, IDisposable
 {
+    private static readonly string DefaultCacheKey = string.Empty;
+
     private readonly IOptionsMonitor<TOptions> _options;
     private readonly ConcurrentDictionary<string, TOptions> _cachedOptions; // cache options per sub provider
 
-    private static string DefaultCacheKey = string.Empty;
-
-    private IDisposable? _optionsReloadToken;
+    private readonly IDisposable? _optionsReloadToken;
 
 
     /// <summary>
@@ -66,9 +80,10 @@ public abstract class FileFormatter<TOptions> : FileFormatter, IDisposable
     /// </summary>
     /// <param name="formatterName"></param>
     /// <param name="options"></param>
+    /// <param name="timeProvider">The clock used for timestamps. Defaults to <see cref="TimeProvider.System"/>.</param>
     /// <exception cref="ArgumentNullException"></exception>
-    public FileFormatter(string formatterName, IOptionsMonitor<TOptions> options)
-        : base(formatterName)
+    public FileFormatter(string formatterName, IOptionsMonitor<TOptions> options, TimeProvider? timeProvider = null)
+        : base(formatterName, timeProvider)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
 
@@ -81,6 +96,7 @@ public abstract class FileFormatter<TOptions> : FileFormatter, IDisposable
     /// </summary>
     public void Dispose()
     {
+        GC.SuppressFinalize(this);
         _optionsReloadToken?.Dispose();
     }
 
@@ -89,16 +105,13 @@ public abstract class FileFormatter<TOptions> : FileFormatter, IDisposable
     /// </summary>
     /// <param name="subProvider"></param>
     /// <returns></returns>
-    protected TOptions GetOptions( string? subProvider)
+    protected TOptions GetOptions(string? subProvider)
     {
         string key = subProvider ?? DefaultCacheKey;
 
-        return _cachedOptions.GetOrAdd(key, (k) => 
-        {
-            return _options.Get(k);
-        });
+        return _cachedOptions.GetOrAdd(key, (k) => _options.Get(k));
     }
-    
+
     private void ReloadLoggerOptions(TOptions options, string? subProviderName)
     {
         var provider = subProviderName ?? DefaultCacheKey;

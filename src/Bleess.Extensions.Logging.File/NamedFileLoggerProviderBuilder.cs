@@ -1,9 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 
 #nullable enable
 
@@ -16,7 +13,7 @@ public sealed class NamedFileLoggerProviderBuilder
 {
     private readonly ILoggingBuilder _builder;
     private readonly string _providerAlias;
-  
+
     internal NamedFileLoggerProviderBuilder(ILoggingBuilder builder, string providerAlias)
     {
         _builder = builder;
@@ -28,8 +25,10 @@ public sealed class NamedFileLoggerProviderBuilder
     /// </summary>
     /// <param name="configure">Configuration delegate</param>
     /// <returns></returns>
-    public NamedFileLoggerProviderBuilder WithOptions(Action<FileLoggerOptions> configure) 
+    public NamedFileLoggerProviderBuilder WithOptions(Action<FileLoggerOptions> configure)
     {
+        ArgumentNullException.ThrowIfNull(configure);
+
         _builder.Services.Configure(_providerAlias, configure);
         return this;
     }
@@ -44,6 +43,7 @@ public sealed class NamedFileLoggerProviderBuilder
         _builder.Services.Configure<FileLoggerOptions>(_providerAlias, c => c.FormatterName = FileFormatterNames.Json);
         if (configure != null)
         {
+            // formatter options are resolved by the sub provider name
             _builder.Services.Configure(_providerAlias, configure);
         }
         return this;
@@ -59,6 +59,7 @@ public sealed class NamedFileLoggerProviderBuilder
         _builder.Services.Configure<FileLoggerOptions>(_providerAlias, c => c.FormatterName = FileFormatterNames.Simple);
         if (configure != null)
         {
+            // formatter options are resolved by the sub provider name
             _builder.Services.Configure(_providerAlias, configure);
         }
         return this;
@@ -69,26 +70,30 @@ public sealed class NamedFileLoggerProviderBuilder
     /// </summary>
     /// <typeparam name="TFormatter"></typeparam>
     /// <typeparam name="TFormatterOptions"></typeparam>
-    /// <param name="formatterName">the type of formatter</param>
+    /// <param name="formatterName">
+    /// The formatter name to select for this provider.  This must match the name that
+    /// <typeparamref name="TFormatter"/> passes to the <see cref="FileFormatter"/> constructor.
+    /// </param>
     /// <param name="configure"></param>
     /// <returns></returns>
     public NamedFileLoggerProviderBuilder WithFormatter<TFormatter, TFormatterOptions>(string formatterName, Action<TFormatterOptions>? configure = null)
         where TFormatter : FileFormatter
         where TFormatterOptions : class
     {
-        _builder.Services.Configure<FileLoggerOptions>(_providerAlias, c => c.FormatterName = formatterName);
+        ArgumentNullException.ThrowIfNull(formatterName);
 
-        // register the formatter type 
+        // register the formatter type with the container
         _builder.AddFileFormatter<TFormatter, TFormatterOptions>();
 
+        // select the formatter for this sub provider
+        _builder.Services.Configure<FileLoggerOptions>(_providerAlias, c => c.FormatterName = formatterName);
+
+        // formatter options are resolved by the sub provider name (see FileFormatter.GetOptions)
         if (configure != null)
         {
-            _builder.Services.Configure(formatterName, configure);
+            _builder.Services.Configure(_providerAlias, configure);
         }
 
-        // configure logger to use a custom formatter
-        _builder.Services.Configure<FileLoggerOptions>(_providerAlias, c => c.FormatterName = _providerAlias);
-        
         return this;
     }
 
@@ -112,7 +117,12 @@ public sealed class NamedFileLoggerProviderBuilder
     /// </summary>
     /// <param name="filter"></param>
     /// <returns></returns>
-    public NamedFileLoggerProviderBuilder WithFilter(Func<string?, LogLevel, bool> filter) => this.WithFilterRule(null, null, null);
+    public NamedFileLoggerProviderBuilder WithFilter(Func<string?, LogLevel, bool> filter)
+    {
+        ArgumentNullException.ThrowIfNull(filter);
+
+        return this.WithFilterRule(null, null, filter);
+    }
 
     /// <summary>
     /// Adds the filtering rule
@@ -123,14 +133,14 @@ public sealed class NamedFileLoggerProviderBuilder
     /// <returns></returns>
     public NamedFileLoggerProviderBuilder WithFilterRule(string? category = null,
            LogLevel? level = null,
-           Func<string?, LogLevel, bool>? filter = null) 
+           Func<string?, LogLevel, bool>? filter = null)
     {
-        _builder.Services.Configure<CompositeLoggerFilterOptions>(_providerAlias, c => 
+        _builder.Services.Configure<CompositeLoggerFilterOptions>(_providerAlias, c =>
         {
             Func<string?, string?, LogLevel, bool>? func = null;
-            if (filter != null) 
+            if (filter != null)
             {
-                func = new Func<string?, string?, LogLevel, bool>((p, c, l) => filter(c, l)); ;
+                func = new Func<string?, string?, LogLevel, bool>((p, c, l) => filter(c, l));
             }
 
             AddRule(c, _providerAlias, category, level, func);

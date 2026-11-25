@@ -1,13 +1,12 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
-using System.Text;
 
 #nullable enable
 
 namespace Bleess.Extensions.Logging.File
 {
-    internal class CompositeLoggerRuleSelector
+    internal static class CompositeLoggerRuleSelector
     {
         /// <summary>
         /// Selects a rule that applies to a sub logger.
@@ -23,19 +22,18 @@ namespace Bleess.Extensions.Logging.File
             filter = null;
             minLevel = options.MinLevel;
 
-           // Filter rule selection:
-           // 1. Select rules for current logger type, if there is none, select ones without logger type specified
-           // 2. Select rules with longest matching categories
-           // 3. If there nothing matched by category take all rules without category
-           // 3. If there is only one rule use it's level and filter
-           // 4. If there are multiple rules use last
-           // 5. If there are no applicable rules use global minimal level
+            // Filter rule selection:
+            // 1. Select rules for current logger type, if there is none, select ones without logger type specified
+            // 2. Select rules with longest matching categories
+            // 3. If there nothing matched by category take all rules without category
+            // 3. If there is only one rule use it's level and filter
+            // 4. If there are multiple rules use last
+            // 5. If there are no applicable rules use global minimal level
 
             LoggerFilterRule? current = null;
             foreach (LoggerFilterRule rule in options.Rules)
             {
-                if (IsBetter(rule, current, provider, category)
-                    || (!string.IsNullOrEmpty(provider) && IsBetter(rule, current, provider, category)))
+                if (IsBetter(rule, current, provider, category))
                 {
                     current = rule;
                 }

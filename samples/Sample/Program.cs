@@ -1,17 +1,17 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using System;
 using System.Diagnostics;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace Sample
 {
-    class Program
+    internal static class Program
     {
-        static void Main(string[] args)
+        private static void Main(string[] args)
         {
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureServices(s => s.AddHostedService<LoggingService>())
@@ -38,10 +38,16 @@ namespace Sample
                                 o.TimestampFormat = "dd h:mm tt";
                             })
                             .WithMinLevel(LogLevel.Error);
+
+                        // example using a custom formatter. the name must match the name the
+                        // formatter passes to the FileFormatter constructor
+                        b.AddFile("CustomLog", o => o.Path = "logs/custom.txt")
+                            .WithFormatter<MyCustomFormatter, MyOptions>(MyCustomFormatter.FormatterName, o => o.Option1 = true)
+                            .WithMinLevel(LogLevel.Warning);
                     });
 
 
-                    l.Configure(f => 
+                    l.Configure(f =>
                     {
                         f.ActivityTrackingOptions = ActivityTrackingOptions.SpanId
                                       | ActivityTrackingOptions.TraceId
@@ -57,44 +63,42 @@ namespace Sample
         }
     }
 
-    class LoggingService : BackgroundService 
-    {  
+    internal sealed class LoggingService : BackgroundService
+    {
+        private readonly ILogger _logger;
 
-        private readonly ILogger logger;
         public LoggingService(ILogger<LoggingService> logger)
         {
-            this.logger = logger;
+            _logger = logger;
         }
 
-        protected async override Task ExecuteAsync(CancellationToken stoppingToken)
+        protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             int i = 0;
             var r = new Random();
 
 
-            await Task.Delay(5000);
+            await Task.Delay(5000, stoppingToken);
 
-            while (!stoppingToken.IsCancellationRequested) 
+            while (!stoppingToken.IsCancellationRequested)
             {
                 i++;
 
                 using var a = new Activity("Sample");
-                    a.Start();
+                a.Start();
 
-                a.SetTag("bar", i.ToString());
+                a.SetTag("bar", i.ToString(CultureInfo.InvariantCulture));
 
-                using (this.logger.BeginScope("Iteration {i}", i++))
+                using (this._logger.BeginScope("Iteration {i}", i++))
                 {
-                    this.logger.LogTrace("This should not be logged");
+                    this._logger.LogTrace("This should not be logged");
 
-                    this.logger.LogDebug("This should be logged");
+                    this._logger.LogDebug("This should be logged");
 
                     if (r.Next(100) > 75)
                     {
-                        this.logger.LogError("This is an error");
+                        this._logger.LogError("This is an error");
                     }
-
-                    //await Task.Delay(1000);
                 }
 
                 a.Stop();

@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="CHANGELOG.md" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="Directory.Packages.props" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="benchmark/Benchmarks/Benchmarks.csproj" />
+  <Project Path="samples/Sample/Sample.csproj" />
+  <Project Path="src/Bleess.Extensions.Logging.File/Bleess.Extensions.Logging.File.csproj" />
+  <Project Path="tests/Tests.csproj" />
+</Solution>

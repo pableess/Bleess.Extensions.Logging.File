@@ -1,0 +1,34 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>false</CentralPackageTransitivePinningEnabled>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+  </PropertyGroup>
+
+  <ItemGroup Label="Library">
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.404" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Configuration" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Configuration" Version="10.0.15" Condition="'$(TargetFramework)' == 'net10.0'" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Configuration" Version="11.0.0" Condition="'$(TargetFramework)' == 'net11.0'" />
+  </ItemGroup>
+
+  <ItemGroup Label="Tests">
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageVersion Include="MSTest.TestAdapter" Version="4.0.1" />
+    <PackageVersion Include="MSTest.TestFramework" Version="4.0.1" />
+    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="10.0.15" Condition="'$(TargetFramework)' == 'net10.0'" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting" Version="11.0.0" Condition="'$(TargetFramework)' == 'net11.0'" />
+  </ItemGroup>
+
+  <ItemGroup Label="Benchmarks">
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+    <PackageVersion Include="Karambolo.Extensions.Logging.File" Version="3.6.0" />
+    <PackageVersion Include="Karambolo.Extensions.Logging.File.Json" Version="3.6.0" />
+    <PackageVersion Include="NReco.Logging.File" Version="1.2.2" />
+  </ItemGroup>
+
+</Project>

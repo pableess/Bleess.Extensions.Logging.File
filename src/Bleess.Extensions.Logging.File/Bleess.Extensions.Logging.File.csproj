@@ -1,24 +1,30 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net9.0;net8.0;net6.0</TargetFrameworks>
-    <LangVersion>latest</LangVersion>
+    <!-- net8.0 is EOL; kept only for consumers that cannot move yet. net10.0 (LTS) and net11.0 are current. -->
+    <TargetFrameworks>net8.0;net10.0;net11.0</TargetFrameworks>
 
     <RepoRoot>$([System.IO.Path]::GetDirectoryName($([MSBuild]::GetPathOfFileAbove('.gitignore', '$(MSBuildThisFileDirectory)'))))</RepoRoot>
 
-    <Deterministic>true</Deterministic>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+
+    <!-- the library does not use reflection over user types, so it is trim/AOT safe -->
+    <IsAotCompatible>true</IsAotCompatible>
 
     <BuildNum>1</BuildNum>
-    
-    <VersionPrefix>3.0.1</VersionPrefix>
+
+    <VersionPrefix>4.0.0</VersionPrefix>
     <VersionSuffix></VersionSuffix>
 
     <FileVersion>$(VersionPrefix).$(BuildNum)</FileVersion>
-    
+
     <Authors>Paul Bleess</Authors>
     <Description>Simple file logger for dotnet Microsoft.Extensions.Logging</Description>
     <Title>File logging for Microsoft.Extensions.Logging</Title>
-    <Copyright>Copyright (c) 2024 Paul Bleess and contributors</Copyright>
+    <Copyright>Copyright (c) 2026 Paul Bleess and contributors</Copyright>
     <AssemblyTitle>Bleess.Extensions.Logging.File</AssemblyTitle>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyName>Bleess.Extensions.Logging.File</AssemblyName>
@@ -31,14 +37,18 @@
     <PackageReleaseNotes>
       How to use: https://github.com/pableess/Bleess.Extensions.Logging.File
 
-      - Basic file logging features: rolling files by date, maximum file length, max number of files, etc
-      - Simple text and json formatters with options for sing7le line, multi-line, and separated log statements
-      - Support for logging scopes
-      - Support for idiomatic configuration via IConfiguration sources or in code
-      - Ability to change settings without restarting application
-      - Dedicated file writing thread for high log throughput and performance
-      - Support for multiple log files with independent settings
+      Breaking changes in 4.0:
+      - Targets .NET 8, .NET 10 and .NET 11 (net6.0 and net9.0 were dropped, both are out of support)
+      - FileLoggerProvider takes a TimeProvider; AddFile/AddFiles register TimeProvider.System if none is registered
+      - File logger options are validated on startup (Path, MaxNumberFiles, MaxFileSizeInMB, MaxFlushInterval)
+      - Date based rolling can use UTC via FileLoggerOptions.UseUtcTimestamp
 
+      Fixes:
+      - Configuration changes now reload the file provider options (path, limits, formatter, flush settings)
+      - Composite logger IsEnabled reports enabled when any sub logger is enabled
+      - WithFilter(Func&lt;string?, LogLevel, bool&gt;) no longer ignores the predicate
+      - WithFormatter uses the formatter name it was given and applies formatter options to the sub provider
+      - Writer swaps no longer race with the write thread; the write thread owns the writer lifecycle
     </PackageReleaseNotes>
 
 
@@ -49,8 +59,7 @@
     <!-- Recommended: Embed symbols containing Source Link in the main file (exe/dll) -->
     <DebugType>embedded</DebugType>
 
-
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <ContinuousIntegrationBuild Condition="'$(TF_BUILD)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
 
   </PropertyGroup>
 
@@ -59,14 +68,6 @@
     <None Include="$(RepoRoot)\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(TF_BUILD)' == 'true'">
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(GITHUB_ACTIONS)' == 'true'">
-    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
-  </PropertyGroup>
-
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
       <_Parameter1>Tests</_Parameter1>
@@ -74,24 +75,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.0.0" PrivateAssets="All" />
-  </ItemGroup>
-
-  <ItemGroup Condition="$(TargetFramework) == 'net9.0'">
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="9.0.0" />
-    <PackageReference Include="System.Text.Json" Version="9.0.0" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
   </ItemGroup>
 
   <ItemGroup Condition="$(TargetFramework) == 'net8.0'">
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="8.0.0" />
-    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" />
   </ItemGroup>
 
-  <ItemGroup Condition="$(TargetFramework) == 'net6.0'">
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="6.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" Version="6.0.0" />
-    <PackageReference Include="System.Text.Json" Version="6.0.11" />
+  <ItemGroup Condition="$(TargetFramework) == 'net10.0'">
+    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" />
+  </ItemGroup>
+
+  <ItemGroup Condition="$(TargetFramework) == 'net11.0'">
+    <PackageReference Include="Microsoft.Extensions.Logging.Configuration" />
   </ItemGroup>
 </Project>

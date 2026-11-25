@@ -1,13 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Bleess.Extensions.Logging.File
 {
     /// <summary>
     /// Wrapper for a named sub logger of a composite logger
     /// </summary>
-    public class SubLoggerRegistration : ISubLoggerRegistration
+    public sealed class SubLoggerRegistration : ISubLoggerRegistration
     {
         /// <summary>
         /// Creates the sub logger name
@@ -15,11 +13,13 @@ namespace Bleess.Extensions.Logging.File
         /// <param name="configName"></param>
         public SubLoggerRegistration(string configName)
         {
+            ArgumentNullException.ThrowIfNull(configName);
+
             this.Name = configName;
         }
 
         /// <inheritdoc/>
         // The name of the sub logger
-        public string Name {  get; private set; }
+        public string Name { get; }
     }
 }

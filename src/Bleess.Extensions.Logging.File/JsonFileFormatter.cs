@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Options;
 using System;
 using System.Buffers;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -13,21 +12,21 @@ using System.Text.Json;
 
 namespace Bleess.Extensions.Logging.File;
 
-internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
-{   
-    public JsonFileFormatter(IOptionsMonitor<JsonFileFormatterOptions> options)
-        : base(FileFormatterNames.Json, options)
+internal sealed class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
+{
+    public JsonFileFormatter(IOptionsMonitor<JsonFileFormatterOptions> options, TimeProvider timeProvider)
+        : base(FileFormatterNames.Json, options, timeProvider)
     {
     }
 
-    public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider scopeProvider, TextWriter textWriter, string? subProviderName, bool? fallbackIncludeScopes)
+    public override void Write<TState>(in LogEntry<TState> logEntry, IExternalScopeProvider? scopeProvider, TextWriter textWriter, string? subProviderName, bool? fallbackIncludeScopes)
     {
         JsonFileFormatterOptions formatterOptions = this.GetOptions(subProviderName);
-        
-        // support obsolete setting on the provider
-        formatterOptions.IncludeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScopes;
 
-        string message = logEntry.Formatter(logEntry.State, logEntry.Exception);
+        // support obsolete setting on the provider. the options instance is shared, so do not mutate it here.
+        bool includeScopes = formatterOptions.IncludeScopes ?? fallbackIncludeScopes ?? false;
+
+        string? message = logEntry.Formatter(logEntry.State, logEntry.Exception);
         if (logEntry.Exception == null && message == null)
         {
             return;
@@ -39,24 +38,25 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
         const int DefaultBufferSize = 1024;
 
         byte[] buffer = ArrayPool<byte>.Shared.Rent(DefaultBufferSize);
+        char[]? charBuffer = null;
         try
         {
-            using (MemoryStream mem = new MemoryStream(buffer))
+            using (MemoryStream mem = new MemoryStream(buffer, 0, buffer.Length, writable: true, publiclyVisible: true))
             {
                 using (var writer = new Utf8JsonWriter(mem, formatterOptions.JsonWriterOptions))
                 {
                     writer.WriteStartObject();
-                    var timestampFormat = formatterOptions.TimestampFormat;
+                    string? timestampFormat = formatterOptions.TimestampFormat;
                     if (timestampFormat != null)
                     {
-                        DateTimeOffset dateTimeOffset = formatterOptions.UseUtcTimestamp ? DateTimeOffset.UtcNow : DateTimeOffset.Now;
+                        DateTimeOffset dateTimeOffset = formatterOptions.UseUtcTimestamp ? TimeProvider.GetUtcNow() : TimeProvider.GetLocalNow();
                         if (formatterOptions.InvariantTimestampFormat)
                         {
                             writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat, CultureInfo.InvariantCulture));
                         }
-                        else 
+                        else
                         {
-                            writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat));
+                            writer.WriteString("Timestamp", dateTimeOffset.ToString(timestampFormat, CultureInfo.CurrentCulture));
                         }
                     }
                     writer.WriteNumber(nameof(logEntry.EventId), eventId);
@@ -87,11 +87,15 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
                         }
                         writer.WriteEndObject();
                     }
-                    WriteScopeInformation(writer, scopeProvider, formatterOptions);
+                    WriteScopeInformation(writer, scopeProvider, includeScopes);
                     writer.WriteEndObject();
                     writer.Flush();
 
-                    textWriter.Write(Encoding.UTF8.GetString(mem.ToArray(), 0, (int)writer.BytesCommitted));
+                    // decode the written bytes without an intermediate string or array copy
+                    int written = (int)writer.BytesCommitted;
+                    charBuffer = ArrayPool<char>.Shared.Rent(Encoding.UTF8.GetMaxCharCount(written));
+                    int charCount = Encoding.UTF8.GetChars(mem.GetBuffer(), 0, written, charBuffer, 0);
+                    textWriter.Write(charBuffer.AsSpan(0, charCount));
 
                     if (formatterOptions.EmptyLineBetweenMessages)
                     {
@@ -103,6 +107,10 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
+            if (charBuffer is not null)
+            {
+                ArrayPool<char>.Shared.Return(charBuffer);
+            }
         }
     }
 
@@ -120,9 +128,9 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
         };
     }
 
-    private void WriteScopeInformation(Utf8JsonWriter writer, IExternalScopeProvider scopeProvider, JsonFileFormatterOptions formatterOptions)
+    private static void WriteScopeInformation(Utf8JsonWriter writer, IExternalScopeProvider? scopeProvider, bool includeScopes)
     {
-        if (formatterOptions.IncludeScopes == true && scopeProvider != null)
+        if (includeScopes && scopeProvider != null)
         {
             writer.WriteStartArray("Scopes");
             scopeProvider.ForEachScope((scope, state) =>
@@ -146,7 +154,7 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
         }
     }
 
-    private void WriteItem(Utf8JsonWriter writer, KeyValuePair<string, object> item)
+    private static void WriteItem(Utf8JsonWriter writer, KeyValuePair<string, object> item)
     {
         var key = item.Key;
         switch (item.Value)
@@ -161,11 +169,7 @@ internal class JsonFileFormatter : FileFormatter<JsonFileFormatterOptions>
                 writer.WriteNumber(key, sbyteValue);
                 break;
             case char charValue:
-#if NET5_0_OR_GREATER
                 writer.WriteString(key, System.Runtime.InteropServices.MemoryMarshal.CreateSpan(ref charValue, 1));
-#else
-                writer.WriteString(key, charValue.ToString());
-#endif
                 break;
             case decimal decimalValue:
                 writer.WriteNumber(key, decimalValue);

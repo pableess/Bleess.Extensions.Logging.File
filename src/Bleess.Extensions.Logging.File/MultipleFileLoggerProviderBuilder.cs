@@ -1,8 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Configuration;
 using System;
-using System.Collections.Generic;
-using System.Text;
+
+#nullable enable
 
 namespace Bleess.Extensions.Logging.File
 {
@@ -24,8 +23,10 @@ namespace Bleess.Extensions.Logging.File
         /// <param name="providerAlias">The provider alias, which can be referenced in configuration for setting options</param>
         /// <param name="configure">A configuration delegate for the options</param>
         /// <returns></returns>
-        public NamedFileLoggerProviderBuilder AddFile(string providerAlias, Action<FileLoggerOptions> configure = null) 
+        public NamedFileLoggerProviderBuilder AddFile(string providerAlias, Action<FileLoggerOptions>? configure = null)
         {
+            ArgumentException.ThrowIfNullOrEmpty(providerAlias);
+
             if (configure == null)
             {
                 _builder.AddFile(providerAlias);
@@ -38,4 +39,3 @@ namespace Bleess.Extensions.Logging.File
         }
     }
 }
-

@@ -1,29 +1,40 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Text;
 using System.Threading;
 
 namespace Bleess.Extensions.Logging.File
 {
-    internal class FileLoggerProcessor : IDisposable
+    /// <summary>
+    /// Queues formatted messages and writes them from a dedicated thread.
+    /// The write thread owns the <see cref="FileWriter"/>; options changes are handed to it as a queue
+    /// entry so that the writer is never swapped or closed from another thread.
+    /// </summary>
+    internal sealed class FileLoggerProcessor : IDisposable
     {
         private readonly BlockingCollection<LogMessageEntry> _messageQueue;
         private readonly Thread _outputThread;
+        private readonly TimeProvider _timeProvider;
 
-        private FileWriter _writer;
-        Stopwatch _lastFlush;
-        long _maxFlushInterval;
+        // owned by the write thread once the thread has started
+        private FileWriter? _writer;
+        private Stopwatch? _lastFlush;
+        private long _maxFlushInterval;
 
-        public FileLoggerProcessor(FileLoggerOptions initialOptions, int maxMessageQueuedMessage = 1024)
+        private readonly object _pendingOptionsLock = new();
+        private bool _disposed;
+        private FileLoggerOptions? _pendingOptions;
+        private volatile bool _hasPendingOptions;
+
+        public FileLoggerProcessor(FileLoggerOptions initialOptions, TimeProvider timeProvider, int maxQueuedMessages = 1024)
         {
-            _messageQueue = new BlockingCollection<LogMessageEntry>(maxMessageQueuedMessage);
+            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+            _messageQueue = new BlockingCollection<LogMessageEntry>(maxQueuedMessages);
 
-            ConfigureWriter(initialOptions);
+            // fail fast: a provider that cannot open its file should not start silently dropping messages
+            ApplyOptions(initialOptions, throwOnError: true);
 
-            // Start file message queue processor
             _outputThread = new Thread(ProcessLogQueue)
             {
                 IsBackground = true,
@@ -32,64 +43,45 @@ namespace Bleess.Extensions.Logging.File
             _outputThread.Start();
         }
 
-        public virtual void EnqueueMessage(ref LogMessageEntry message)
+        public void EnqueueMessage(LogMessageEntry message)
         {
-            if (!_messageQueue.IsAddingCompleted)
+            try
             {
-                try
+                _messageQueue.Add(message);
+            }
+            catch (InvalidOperationException)
+            {
+                // the queue is complete (provider is shutting down); logging after dispose is a no-op.
+                // ObjectDisposedException derives from InvalidOperationException and is covered too.
+            }
+        }
+
+        /// <summary>
+        /// Applies new provider options.  Safe to call from any thread: the options are applied by the
+        /// write thread when it reaches the marker in the queue.
+        /// </summary>
+        public void ConfigureWriter(FileLoggerOptions options)
+        {
+            lock (_pendingOptionsLock)
+            {
+                _pendingOptions = options;
+                _hasPendingOptions = true;
+            }
+
+            try
+            {
+                // wake the write thread. If the queue is saturated the pending options are picked up
+                // in front of the next message instead.
+                if (!_messageQueue.TryAdd(LogMessageEntry.ConfigurationChanged, 100))
                 {
-                    _messageQueue.Add(message);
                     return;
                 }
-                catch (InvalidOperationException) { }
             }
-
-            // Adding is completed so just log the message
-            try
+            catch (InvalidOperationException)
             {
-                _writer?.WriteMessage(message.Message, true);
-            }
-            catch (Exception) { }
-        }
-
-        // this needs to be called before the 
-        public void ConfigureWriter(FileLoggerOptions options) 
-        {
-            try
-            {
-                if (options.MaxFlushInterval != null && options.MaxFlushInterval >= 0)
-                {
-                    _lastFlush = Stopwatch.StartNew();
-                    _maxFlushInterval = options.MaxFlushInterval.Value;
-                }
-                else 
-                {
-                    _lastFlush?.Stop();
-                    _lastFlush = null;
-                }
-
-                // if the file path didn't change, just update the limits
-                if (this._writer != null && this._writer?.FilePath == options.Path && this._writer.RollInterval == options.RollInterval)
-                {
-                    this._writer.SetLimits(options.MaxFileSizeInBytes, options.MaxNumberFiles, options.FlushToDisk);
-                }
-                else
-                {
-                    // else swap out the writer and close the old one 
-                    var newWriter = new FileWriter(options.Path, options.MaxFileSizeInBytes, options.MaxNumberFiles, options.Append, options.RollInterval, options.FlushToDisk);
-
-                    FileWriter oldWriter = Interlocked.Exchange(ref this._writer, newWriter) as FileWriter;
-
-                    oldWriter?.Close();
-                }
-            }
-            catch (Exception writerError) 
-            {
-                System.Diagnostics.Trace.TraceError($"Error creating file writer: {writerError.ToString()}");
+                // provider is shutting down
             }
         }
-
-
 
         private void ProcessLogQueue()
         {
@@ -97,43 +89,137 @@ namespace Bleess.Extensions.Logging.File
             {
                 foreach (LogMessageEntry message in _messageQueue.GetConsumingEnumerable())
                 {
-                    bool flush = _messageQueue.Count == 0 || (_lastFlush != null && _lastFlush?.ElapsedMilliseconds >= _maxFlushInterval);
-
-                    _writer?.WriteMessage(message.Message, flush);
-
-                    if (flush && _lastFlush != null) 
+                    if (message.IsConfigurationChanged)
                     {
-                        // race condition so check for null again
+                        ApplyPendingOptions();
+                        continue;
+                    }
+
+                    if (_hasPendingOptions)
+                    {
+                        ApplyPendingOptions();
+                    }
+
+                    bool flush = _messageQueue.Count == 0
+                        || (_lastFlush is not null && _lastFlush.ElapsedMilliseconds >= _maxFlushInterval);
+
+                    _writer?.WriteMessage(message.Message!, flush);
+
+                    if (flush)
+                    {
                         _lastFlush?.Restart();
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                // nothing sane to do here: completing the queue stops the producer side from blocking
+                Trace.TraceError($"File logger write thread failed: {ex}");
                 try
                 {
                     _messageQueue.CompleteAdding();
                 }
-                catch { }
+                catch (ObjectDisposedException)
+                {
+                }
+            }
+            finally
+            {
+                // the write thread owns the writer, so it closes it
+                _writer?.Close();
+                _writer = null;
+            }
+        }
+
+        private void ApplyPendingOptions()
+        {
+            FileLoggerOptions? options;
+            lock (_pendingOptionsLock)
+            {
+                options = _pendingOptions;
+                _pendingOptions = null;
+                _hasPendingOptions = false;
+            }
+
+            if (options is not null)
+            {
+                ApplyOptions(options, throwOnError: false);
+            }
+        }
+
+        private void ApplyOptions(FileLoggerOptions options, bool throwOnError)
+        {
+            try
+            {
+                if (options.MaxFlushInterval is >= 0 and int maxFlushInterval)
+                {
+                    _lastFlush = Stopwatch.StartNew();
+                    _maxFlushInterval = maxFlushInterval;
+                }
+                else
+                {
+                    _lastFlush = null;
+                }
+
+                // if the file path didn't change, just update the limits
+                if (_writer is not null && _writer.FilePath == options.Path && _writer.RollInterval == options.RollInterval)
+                {
+                    _writer.SetLimits(options.MaxFileSizeInBytes, options.MaxNumberFiles, options.FlushToDisk);
+                }
+                else
+                {
+                    // create (and validate) the new writer before closing the old one so that a failed
+                    // reload keeps writing to the previous file
+                    var newWriter = new FileWriter(
+                        options.Path,
+                        options.MaxFileSizeInBytes,
+                        options.MaxNumberFiles,
+                        options.Append,
+                        options.RollInterval,
+                        options.FlushToDisk,
+                        options.UseUtcTimestamp,
+                        _timeProvider);
+
+                    FileWriter? oldWriter = _writer;
+                    _writer = newWriter;
+                    oldWriter?.Close();
+                }
+            }
+            catch (Exception writerError)
+            {
+                if (throwOnError)
+                {
+                    throw new InvalidOperationException($"Unable to open the log file '{options.Path}'.", writerError);
+                }
+
+                // keep writing to the previous file
+                Trace.TraceError($"Error applying file logger options for '{options.Path}': {writerError}");
             }
         }
 
         public void Dispose()
         {
-            _lastFlush?.Stop();
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
             _messageQueue.CompleteAdding();
 
             try
             {
-                // wait for the queue to finish processing
-                _outputThread.Join(5000); // shouldn't need a timeout here, but this is more than enough time
+                // the write thread drains the queue and closes the writer
+                if (_outputThread.Join(5000))
+                {
+                    _messageQueue.Dispose();
+                }
             }
-            catch (ThreadStateException) { }
+            catch (ThreadStateException)
+            {
+            }
 
-
-            // flush and close writer
-            _writer?.Close();
-
+            // do not close the writer here: if the join timed out the write thread still owns it
         }
     }
 }

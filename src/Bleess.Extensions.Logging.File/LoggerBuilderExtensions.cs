@@ -1,6 +1,7 @@
 ﻿namespace Microsoft.Extensions.Logging
 {
     using System;
+using System.Diagnostics.CodeAnalysis;
     using Bleess.Extensions.Logging.File;
     using Microsoft.Extensions.Configuration;
     using Microsoft.Extensions.DependencyInjection;
@@ -18,9 +19,15 @@
         /// Adds a file logger named 'File' to the factory.
         /// </summary>
         /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
+        [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Options are bound from configuration. This is the same reflection requirement as the built-in Microsoft.Extensions.Logging providers.")]
+        [UnconditionalSuppressMessage("Aot", "IL3050", Justification = "See IL2026: configuration binding requires reflection.")]
         public static ILoggingBuilder AddFile(this ILoggingBuilder builder)
         {
             builder.AddConfiguration();
+
+            // lets tests and hosts supply their own clock
+            builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+            builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IValidateOptions<FileLoggerOptions>, FileLoggerOptionsValidator>());
 
             builder.AddFileFormatter<JsonFileFormatter, JsonFileFormatterOptions>();
             builder.AddFileFormatter<SimpleFileFormatter, SimpleFileFormatterOptions>();
@@ -38,10 +45,7 @@
         /// <param name="configure">A delegate to configure the <see cref="FileLogger"/>.</param>
         public static ILoggingBuilder AddFile(this ILoggingBuilder builder, Action<FileLoggerOptions> configure)
         {
-            if (configure == null)
-            {
-                throw new ArgumentNullException(nameof(configure));
-            }
+            ArgumentNullException.ThrowIfNull(configure);
 
             builder.AddFile();
             builder.Services.Configure(configure);
@@ -55,7 +59,7 @@
         /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
         /// <param name="configureLoggerOptions">A delegate to configure the <see cref="FileLoggerOptions"/> options</param>
         /// <param name="configureFormatterOptions">A delegate to configure the <see cref="SimpleFileFormatterOptions"/> options for the built-in default log formatter.</param>
-        public static ILoggingBuilder AddSimpleFile(this ILoggingBuilder builder, Action<FileLoggerOptions> configureLoggerOptions = null, Action<SimpleFileFormatterOptions> configureFormatterOptions = null)
+        public static ILoggingBuilder AddSimpleFile(this ILoggingBuilder builder, Action<FileLoggerOptions>? configureLoggerOptions = null, Action<SimpleFileFormatterOptions>? configureFormatterOptions = null)
         {
             builder.AddFileUsingFormatter<SimpleFileFormatterOptions>(FileFormatterNames.Simple, configureFormatterOptions);
 
@@ -73,7 +77,7 @@
         /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
         /// <param name="configureLoggerOptions">A delegate to configure the <see cref="FileLoggerOptions"/> for the built-in json log formatter.</param>
         /// <param name="configureFormatterOptions">A delegate to configure the <see cref="JsonFileFormatterOptions"/> for the built-in json log formatter.</param>
-        public static ILoggingBuilder AddJsonFile(this ILoggingBuilder builder, Action<FileLoggerOptions> configureLoggerOptions = null, Action<JsonFileFormatterOptions> configureFormatterOptions = null)
+        public static ILoggingBuilder AddJsonFile(this ILoggingBuilder builder, Action<FileLoggerOptions>? configureLoggerOptions = null, Action<JsonFileFormatterOptions>? configureFormatterOptions = null)
         {
             builder.AddFileUsingFormatter<JsonFileFormatterOptions>(FileFormatterNames.Json, configureFormatterOptions);
 
@@ -94,7 +98,7 @@
         /// <param name="configure"></param>
         /// <returns></returns>
         /// <exception cref="ArgumentNullException"></exception>
-        internal static ILoggingBuilder AddFileUsingFormatter<TFormatterOptions>(this ILoggingBuilder builder, string formatterName, Action<TFormatterOptions> configure = null)
+        internal static ILoggingBuilder AddFileUsingFormatter<TFormatterOptions>(this ILoggingBuilder builder, string formatterName, Action<TFormatterOptions>? configure = null)
             where TFormatterOptions : FileFormatterOptions
         {
             // Add file and configure options to use the named options
@@ -111,12 +115,14 @@
         /// Adds a custom File logger formatter 'TFormatter' to be configured with options 'TOptions'.
         /// </summary>
         /// <param name="builder">The <see cref="ILoggingBuilder"/> to use.</param>
+        [UnconditionalSuppressMessage("Trimming", "IL2091", Justification = "Formatter types are supplied by the application.")]
         public static ILoggingBuilder AddFileFormatter<TFormatter, TFormatterOptions>(this ILoggingBuilder builder)
             where TFormatter : FileFormatter
             where TFormatterOptions : class
         {
             builder.AddConfiguration();
 
+            builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
             builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<FileFormatter, TFormatter>());
             builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<TFormatterOptions>, FileLoggerFormatterConfigureOptions<TFormatter, TFormatterOptions>>());
             builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IOptionsChangeTokenSource<TFormatterOptions>, FileLoggerFormatterOptionsChangeTokenSource<TFormatter, TFormatterOptions>>());
@@ -133,10 +139,7 @@
             where TFormatterOptions : class
             where TFormatter : FileFormatter
         {
-            if (configure == null)
-            {
-                throw new ArgumentNullException(nameof(configure));
-            }
+            ArgumentNullException.ThrowIfNull(configure);
 
             builder.AddFileFormatter<TFormatter, TFormatterOptions>();
             builder.Services.Configure(configure);
@@ -144,6 +147,9 @@
         }
     }
 
+    [UnconditionalSuppressMessage("Trimming", "IL2026", Justification = "Options are bound from configuration. This is the same reflection requirement as the built-in Microsoft.Extensions.Logging providers.")]
+    [UnconditionalSuppressMessage("Aot", "IL3050", Justification = "See IL2026: configuration binding requires reflection.")]
+    [UnconditionalSuppressMessage("Trimming", "IL2091", Justification = "TOptions is supplied by the application and bound from configuration.")]
     internal class FileLoggerFormatterConfigureOptions<TFormatter, TOptions> : ConfigureFromConfigurationOptions<TOptions>
         where TOptions : class
         where TFormatter : FileFormatter

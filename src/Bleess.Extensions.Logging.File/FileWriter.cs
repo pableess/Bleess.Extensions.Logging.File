@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Security;
-using System.Text;
 using System.Threading;
 
 namespace Bleess.Extensions.Logging.File
@@ -26,35 +23,51 @@ namespace Bleess.Extensions.Logging.File
     /// 
     ///
     /// </summary>
-    internal class FileWriter 
+    internal sealed class FileWriter : IDisposable
     {
-        static TraceSource ts = new TraceSource(typeof(FileWriter).FullName);
+        private static readonly TraceSource s_trace = new TraceSource(typeof(FileWriter).FullName ?? nameof(FileWriter));
 
-        private WriteCountingFileStream logFileStream;
-        private TextWriter logFileWriter;
+        private WriteCountingFileStream? logFileStream;
+        private TextWriter? logFileWriter;
         private long fileSizeLimitBytes;
         private bool flushToDisk;
         private int maxRollingFiles;
-        private bool append;
+        private readonly bool append;
         private bool hasOpened;
 
         private volatile bool checkExtraFiles;
 
-        private RollingFileInfo rollingFileInfo;
+        private readonly RollingFileInfo rollingFileInfo;
 
-        private readonly object limitsLock = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock limitsLock = new();
+#else
+        private readonly object limitsLock = new();
+#endif
 
-        internal FileWriter(string path, long fileSizeLimitBytes, int maxRollingFiles, bool append, RollingInterval rollInterval, bool flushToDisk)
+        internal FileWriter(
+            string path,
+            long fileSizeLimitBytes,
+            int maxRollingFiles,
+            bool append,
+            RollingInterval rollInterval,
+            bool flushToDisk,
+            bool useUtcTimestamps,
+            TimeProvider timeProvider)
         {
             this.FilePath = path;
             this.fileSizeLimitBytes = fileSizeLimitBytes;
             this.maxRollingFiles = maxRollingFiles;
             this.RollInterval = rollInterval;
-            this.rollingFileInfo = new RollingFileInfo(path, rollInterval, false);
+            this.rollingFileInfo = new RollingFileInfo(path, rollInterval, useUtcTimestamps, timeProvider);
             this.flushToDisk = flushToDisk;
 
             this.append = append;
-         }
+
+            // open eagerly so that an unwritable path or an invalid directory fails at startup instead of
+            // being discovered later on the write thread (where the message would be lost)
+            OpenAndAlignFile();
+        }
 
         public string FilePath { get; }
 
@@ -83,7 +96,7 @@ namespace Bleess.Extensions.Logging.File
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void CheckOpen() 
+        private void CheckOpen()
         {
             if (!this.hasOpened)
             {
@@ -91,7 +104,7 @@ namespace Bleess.Extensions.Logging.File
             }
         }
 
-        void OpenAndAlignFile()
+        private void OpenAndAlignFile()
         {
             if (this.fileSizeLimitBytes > 0)
             {
@@ -102,13 +115,13 @@ namespace Bleess.Extensions.Logging.File
             OpenFile(this.append);
         }
 
-        void OpenFile(bool append)
+        private void OpenFile(bool append)
         {
             var fileInfo = new FileInfo(rollingFileInfo.CurrentFile);
 
             // Directory.Create will check if the directory already exists,
             // so there is no need for a "manual" check first.
-            fileInfo.Directory.Create();
+            fileInfo.Directory?.Create();
 
             // wrap the file stream with a stream that tracks the size without an p/invoke on every .Lenght reference
             logFileStream = new FileStream(rollingFileInfo.CurrentFile, FileMode.OpenOrCreate, FileAccess.Write).ToWriteCountingStream();
@@ -121,17 +134,17 @@ namespace Bleess.Extensions.Logging.File
                 logFileStream.SetLength(0); // clear the file
             }
             logFileWriter = new StreamWriter(logFileStream);
-           
+
             this.hasOpened = true;
         }
 
-        void CheckForNewLogFile()
+        private void CheckForNewLogFile()
         {
             bool sizeExceeded = false;
 
             long sizeLimitInBytes = Interlocked.Read(ref fileSizeLimitBytes);
 
-            if (sizeLimitInBytes > 0 && logFileStream.Length > sizeLimitInBytes) 
+            if (sizeLimitInBytes > 0 && logFileStream!.Length > sizeLimitInBytes)
             {
                 sizeExceeded = true;
             }
@@ -154,34 +167,46 @@ namespace Bleess.Extensions.Logging.File
         /// <summary>
         /// if there are more files than the maxcount then remove the oldest ones if possible
         /// </summary>
-        void RemoveExtraFiles()
+        private void RemoveExtraFiles()
         {
+            // read the limit once: it may be changed from another thread
+            int maxFiles = Volatile.Read(ref this.maxRollingFiles);
+
             var matchingFiles = rollingFileInfo.GetMatchingFilesByOldest();
 
             // how many to remove
-            int removeCount = matchingFiles.Count() - this.maxRollingFiles;
-
-            var iterator = matchingFiles.GetEnumerator();
-
-            for (int i = 0; i < removeCount; i++)
+            int removeCount = matchingFiles.Length - maxFiles;
+            if (removeCount <= 0)
             {
-                if (iterator.MoveNext())
-                {
-                    if (iterator.Current.FullName == new FileInfo(rollingFileInfo.CurrentFile).FullName)
-                    {
-                        System.Diagnostics.Debug.Fail("Error");
-                    }
+                return;
+            }
 
-                    try
-                    {
-                        iterator.Current.Delete();
-                    }
-                    catch (Exception)
-                    {
-                        ts.TraceInformation($"unable to remove {iterator.Current}");
-                    }
+            string currentFile = Path.GetFullPath(rollingFileInfo.CurrentFile);
+            // file names are case sensitive on Unix
+            var pathComparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+
+            foreach (var file in matchingFiles)
+            {
+                if (removeCount <= 0)
+                {
+                    break;
                 }
-                
+
+                // never delete the file that is currently being written
+                if (string.Equals(file.FullName, currentFile, pathComparison))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    file.Delete();
+                    removeCount--;
+                }
+                catch (Exception ex)
+                {
+                    s_trace.TraceEvent(TraceEventType.Warning, 0, $"Unable to remove log file '{file.FullName}': {ex.Message}");
+                }
             }
         }
 
@@ -189,11 +214,11 @@ namespace Bleess.Extensions.Logging.File
         {
             CheckOpen();
 
-            if (logFileWriter != null)
+            if (logFileWriter is not null)
             {
                 CheckForNewLogFile();
 
-                if (checkExtraFiles) 
+                if (checkExtraFiles)
                 {
                     RemoveExtraFiles();
                     checkExtraFiles = false;
@@ -205,14 +230,16 @@ namespace Bleess.Extensions.Logging.File
                 if (flush)
                 {
                     logFileWriter.Flush();
-                    logFileStream.Flush(this.flushToDisk);
+                    logFileStream!.Flush(this.flushToDisk);
                 }
             }
         }
 
+        public void Dispose() => Close();
+
         internal void Close()
         {
-            if (logFileWriter != null)
+            if (logFileWriter is not null)
             {
                 var logWriter = logFileWriter;
                 logFileWriter = null;
@@ -220,7 +247,7 @@ namespace Bleess.Extensions.Logging.File
                 logWriter.Flush();
                 logWriter.Close();
                 logWriter.Dispose();
-                logFileStream.Dispose();
+                logFileStream?.Dispose();
                 logFileStream = null;
             }
         }

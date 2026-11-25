@@ -1,13 +1,13 @@
 ﻿using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Text;
+
+#nullable enable
 
 namespace Bleess.Extensions.Logging.File
-{ 
+{
     /// <summary>
-  /// Holds the information for a single log entry.
-  /// </summary>
+    /// Holds the information for a single log entry.
+    /// </summary>
     public readonly struct LogEntry<TState>
     {
         /// <summary>
@@ -19,7 +19,7 @@ namespace Bleess.Extensions.Logging.File
         /// <param name="state">The state for which log is being written.</param>
         /// <param name="exception">The log exception.</param>
         /// <param name="formatter">The formatter.</param>
-        public LogEntry(LogLevel logLevel, string category, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        public LogEntry(LogLevel logLevel, string category, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             LogLevel = logLevel;
             Category = category;
@@ -52,11 +52,11 @@ namespace Bleess.Extensions.Logging.File
         /// <summary>
         /// Gets the log exception
         /// </summary>
-        public Exception Exception { get; }
+        public Exception? Exception { get; }
 
         /// <summary>
         /// Gets the formatter
         /// </summary>
-        public Func<TState, Exception, string> Formatter { get; }
+        public Func<TState, Exception?, string> Formatter { get; }
     }
 }

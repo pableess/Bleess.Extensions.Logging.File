@@ -1,0 +1,30 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.{csproj,props,targets,slnx,json,yml,yaml,editorconfig}]
+indent_size = 2
+
+[*.cs]
+# this repository historically uses file scoped + block namespaces mixed; keep formatting stable
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+csharp_new_line_before_open_brace = all
+csharp_style_namespace_declarations = file_scoped:suggestion
+
+# nullability is enabled for the library project
+dotnet_style_null_propagation = true:suggestion
+
+# analyzers: keep the build clean without blocking local work
+dotnet_analyzer_diagnostic.category-Style.severity = suggestion
+dotnet_diagnostic.CA1062.severity = none
+
+[*.md]
+trim_trailing_whitespace = false

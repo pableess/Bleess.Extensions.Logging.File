@@ -1,134 +1,195 @@
 ﻿using Bleess.Extensions.Logging.File;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Tests
 {
     [TestClass]
     public class RollingFileInfoTests
     {
+        private static readonly DateTimeOffset Now = new DateTimeOffset(2024, 1, 15, 10, 30, 0, TimeSpan.Zero);
+
+        private static TestTimeProvider Clock() => new TestTimeProvider(Now);
+
         [TestMethod]
-        public void TestFileName() 
+        public void TestFileName()
         {
-            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Day, true);
-           
-            Assert.AreEqual($"logs/log_{DateTime.UtcNow.ToString("yyyyMMdd")}.txt", info.CurrentFile);
+            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Day, true, Clock());
+
+            Assert.AreEqual("logs/log_20240115.txt", info.CurrentFile);
         }
 
         [TestMethod]
         public void TestFileNameSeq()
         {
-            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Day, true);
+            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Day, true, Clock());
 
             info.Roll(true);
             info.Roll(true);
 
-            Assert.AreEqual($"logs/log_{DateTime.UtcNow.ToString("yyyyMMdd")}_002.txt", info.CurrentFile);
+            Assert.AreEqual("logs/log_20240115_002.txt", info.CurrentFile);
         }
 
         [TestMethod]
         public void TestFileNameNoDate()
         {
-            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Infinite, true);
+            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Infinite, true, Clock());
 
-            Assert.AreEqual($"logs/log.txt", info.CurrentFile);
+            Assert.AreEqual("logs/log.txt", info.CurrentFile);
         }
 
         [TestMethod]
         public void TestFileNameNoDateSeq()
         {
-            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Infinite, true);
+            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Infinite, true, Clock());
 
             info.Roll(true);
-            Assert.AreEqual($"logs/log_001.txt", info.CurrentFile);
+            Assert.AreEqual("logs/log_001.txt", info.CurrentFile);
         }
 
         [TestMethod]
-        [DoNotParallelize]
+        public void TestFileNameWithoutExtensionDoesNotGetTrailingDot()
+        {
+            RollingFileInfo info = new RollingFileInfo("logs/log", RollingInterval.Day, true, Clock());
+
+            Assert.AreEqual("logs/log_20240115", info.CurrentFile);
+        }
+
+        [TestMethod]
+        public void TestMinuteInterval()
+        {
+            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Minute, true, Clock());
+
+            Assert.AreEqual("logs/log_202401151030.txt", info.CurrentFile);
+        }
+
+        [TestMethod]
+        public void TestShouldDateRoll()
+        {
+            var clock = Clock();
+            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Day, true, clock);
+
+            Assert.IsFalse(info.ShouldDateRoll());
+
+            clock.Advance(TimeSpan.FromDays(1));
+
+            Assert.IsTrue(info.ShouldDateRoll());
+        }
+
+        [TestMethod]
+        public void TestShouldDateRollIsFalseForInfinite()
+        {
+            var clock = Clock();
+            RollingFileInfo info = new RollingFileInfo("logs/log.txt", RollingInterval.Infinite, true, clock);
+
+            clock.Advance(TimeSpan.FromDays(400));
+
+            Assert.IsFalse(info.ShouldDateRoll());
+        }
+
+        [TestMethod]
         public void TestAlign()
         {
-            var random = Path.ChangeExtension(Path.GetRandomFileName(), null);
+            using var dir = TestDirectory.Create();
 
-            Directory.CreateDirectory($"logs/{random}");
+            // alignment uses the last write timestamp, so set them explicitly
+            WriteFile(dir.File("foo_2024011410.json"), Now.AddDays(-1));
+            WriteFile(dir.File("foo_2024011510.json"), Now.AddMinutes(-3));
+            WriteFile(dir.File("foo_2024011510_001.json"), Now.AddMinutes(-2));
+            WriteFile(dir.File("foo_2024011510_002.json"), Now.AddMinutes(-1));
 
-            // alg uses last write timestamp, so write them in order
-            File.AppendText($"logs/{random}/foo_{DateTime.Now.Subtract(TimeSpan.FromDays(1)).ToString("yyyyMMddHH")}.json").Close();
-            Thread.Sleep(50);
+            RollingFileInfo info = new RollingFileInfo(dir.File("foo.json"), RollingInterval.Hour, true, Clock());
 
-            File.AppendText($"logs/{random}/foo_{DateTime.Now.ToString("yyyyMMddHH")}_001.json")?.Close();
-            Thread.Sleep(50);
+            var result = info.AlignToDirectory();
 
-            File.AppendText($"logs/{random}/foo_{DateTime.Now.ToString("yyyyMMddHH")}_002.json")?.Close();
-
-            try
-            {
-                RollingFileInfo info = new RollingFileInfo($"logs/{random}/foo.json", RollingInterval.Hour, false);
-
-                var result = info.AlignToDirectory();
-
-                Assert.IsTrue(result);
-                Assert.AreEqual(2, info.FileSequence);
-                Assert.AreEqual($"logs/{random}/foo_{DateTime.Now.ToString("yyyyMMddHH")}_002.json", info.CurrentFile);
-
-            }
-            finally 
-            {
-                Directory.Delete($"logs/{random}", true);
-            }
+            Assert.IsTrue(result);
+            Assert.AreEqual(2, info.FileSequence);
+            Assert.AreEqual(dir.File("foo_2024011510_002.json"), info.CurrentFile);
         }
 
         [TestMethod]
-        [DoNotParallelize]
         public void TestAlignNoDate()
         {
-            var random = Path.ChangeExtension(Path.GetRandomFileName(), null);
+            using var dir = TestDirectory.Create();
 
-            Directory.CreateDirectory($"logs/{random}");
+            WriteFile(dir.File("foo.json"), Now.AddMinutes(-3));
+            WriteFile(dir.File("foo_002.json"), Now.AddMinutes(-2));
+            WriteFile(dir.File("foo_003.json"), Now.AddMinutes(-1));
 
-            // alg uses last write timestamp, so write them in order
-            File.AppendText($"logs/{random}/foo.json")?.Close();
-            Thread.Sleep(50);
-            File.AppendText($"logs/{random}/foo_002.json")?.Close();
-            Thread.Sleep(50);
-            File.AppendText($"logs/{random}/foo_003.json")?.Close();
+            RollingFileInfo info = new RollingFileInfo(dir.File("foo.json"), RollingInterval.Infinite, true, Clock());
 
-           
+            var result = info.AlignToDirectory();
 
-            try
-            {
-                RollingFileInfo info = new RollingFileInfo($"logs/{random}/foo.json", RollingInterval.Infinite, false);
+            Assert.IsTrue(result);
+            Assert.AreEqual(3, info.FileSequence);
+            Assert.AreEqual(dir.File("foo_003.json"), info.CurrentFile);
+        }
 
-                var result = info.AlignToDirectory();
+        [TestMethod]
+        public void TestAlignDateFileWithoutSequenceIsNotTreatedAsASequence()
+        {
+            using var dir = TestDirectory.Create();
 
-                Assert.IsTrue(result);
-                Assert.AreEqual(3, info.FileSequence);
-                Assert.AreEqual($"logs/{random}/foo_003.json", info.CurrentFile);
+            WriteFile(dir.File("foo_2024011510.json"), Now.AddMinutes(-1));
 
-            }
-            finally
-            {
-                Directory.Delete($"logs/{random}", true);
-            }
+            RollingFileInfo info = new RollingFileInfo(dir.File("foo.json"), RollingInterval.Hour, true, Clock());
+
+            Assert.IsTrue(info.AlignToDirectory());
+            Assert.AreEqual(0, info.FileSequence);
+            Assert.AreEqual(dir.File("foo_2024011510.json"), info.CurrentFile);
+        }
+
+        [TestMethod]
+        public void TestAlignSupportsSequencesWiderThanThreeDigits()
+        {
+            using var dir = TestDirectory.Create();
+
+            WriteFile(dir.File("foo_1234.json"), Now.AddMinutes(-1));
+
+            RollingFileInfo info = new RollingFileInfo(dir.File("foo.json"), RollingInterval.Infinite, true, Clock());
+
+            Assert.IsTrue(info.AlignToDirectory());
+            Assert.AreEqual(1234, info.FileSequence);
+            Assert.AreEqual(dir.File("foo_1234.json"), info.CurrentFile);
+        }
+
+        [TestMethod]
+        public void TestAlignIgnoresFilesFromAnotherInterval()
+        {
+            using var dir = TestDirectory.Create();
+
+            WriteFile(dir.File("foo_2024011410.json"), Now.AddMinutes(-1));
+
+            RollingFileInfo info = new RollingFileInfo(dir.File("foo.json"), RollingInterval.Hour, true, Clock());
+
+            Assert.IsFalse(info.AlignToDirectory());
+            Assert.AreEqual(0, info.FileSequence);
         }
 
         [TestMethod]
         public void TestMatching()
         {
-            RollingFileInfo info = new RollingFileInfo("data/sample.txt", RollingInterval.Infinite, true);
+            using var dir = TestDirectory.Create();
 
-            var result = info.GetMatchingFilesByOldest().ToArray();
-            Assert.IsTrue(result.Length == 3);
-            Assert.IsTrue(result[0].Name == "sample_20240115.txt");
-            Assert.IsTrue(result[1].Name == "sample_20240116.txt");
-            Assert.IsTrue(result[2].Name == "sample_20240116_001.txt");
+            WriteFile(dir.File("sample_20240115.txt"), Now.AddDays(-1));
+            WriteFile(dir.File("sample_20240116.txt"), Now.AddMinutes(-2));
+            WriteFile(dir.File("sample_20240116_001.txt"), Now.AddMinutes(-1));
 
+            RollingFileInfo info = new RollingFileInfo(dir.File("sample.txt"), RollingInterval.Infinite, true, Clock());
 
+            var result = info.GetMatchingFilesByOldest();
+            Assert.AreEqual(3, result.Length);
+            Assert.AreEqual("sample_20240115.txt", result[0].Name);
+            Assert.AreEqual("sample_20240116.txt", result[1].Name);
+            Assert.AreEqual("sample_20240116_001.txt", result[2].Name);
+        }
+
+        private static void WriteFile(string path, DateTimeOffset lastWrite)
+        {
+            File.WriteAllText(path, "test");
+            File.SetLastWriteTimeUtc(path, lastWrite.UtcDateTime);
         }
     }
 }
