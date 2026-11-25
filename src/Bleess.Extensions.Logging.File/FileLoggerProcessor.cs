@@ -25,7 +25,6 @@ namespace Bleess.Extensions.Logging.File
         private readonly object _pendingOptionsLock = new();
         private bool _disposed;
         private FileLoggerOptions? _pendingOptions;
-        private volatile bool _hasPendingOptions;
 
         public FileLoggerProcessor(FileLoggerOptions initialOptions, TimeProvider timeProvider, int maxQueuedMessages = 1024)
         {
@@ -65,17 +64,15 @@ namespace Bleess.Extensions.Logging.File
             lock (_pendingOptionsLock)
             {
                 _pendingOptions = options;
-                _hasPendingOptions = true;
             }
 
             try
             {
-                // wake the write thread. If the queue is saturated the pending options are picked up
-                // in front of the next message instead.
-                if (!_messageQueue.TryAdd(LogMessageEntry.ConfigurationChanged, 100))
-                {
-                    return;
-                }
+                // Block until the marker fits. It must be enqueued behind the messages that were
+                // already waiting, otherwise a message produced before the change could be written
+                // with the new settings. The write thread is draining the queue, so this only waits
+                // for a free slot.
+                _messageQueue.Add(LogMessageEntry.ConfigurationChanged);
             }
             catch (InvalidOperationException)
             {
@@ -93,11 +90,6 @@ namespace Bleess.Extensions.Logging.File
                     {
                         ApplyPendingOptions();
                         continue;
-                    }
-
-                    if (_hasPendingOptions)
-                    {
-                        ApplyPendingOptions();
                     }
 
                     bool flush = _messageQueue.Count == 0
@@ -138,7 +130,6 @@ namespace Bleess.Extensions.Logging.File
             {
                 options = _pendingOptions;
                 _pendingOptions = null;
-                _hasPendingOptions = false;
             }
 
             if (options is not null)
